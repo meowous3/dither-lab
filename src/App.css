@@ -402,6 +402,21 @@ input[type="color"] {
   color: var(--fg2);
 }
 
+/* Checkbox row */
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.checkbox-row input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
 /* Scrollbar */
 .panel-right::-webkit-scrollbar { width: 6px; }
 .panel-right::-webkit-scrollbar-track { background: transparent; }

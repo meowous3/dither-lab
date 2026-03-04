@@ -98,8 +98,8 @@ export function GradientControls({ gradient, onUpdate }: GradientControlsProps) 
             />
             <input
               type="range"
-              min={0}
-              max={1}
+              min={-1.5}
+              max={1.5}
               step={0.01}
               value={stop.position}
               onChange={(e) => updateStop(i, { position: Number(e.target.value) })}

@@ -4,10 +4,11 @@ interface OutputControlsProps {
   ditherScale: number;
   colorCount: number;
   ditherStrength: number;
-  onUpdate: (partial: { width?: number; height?: number; ditherScale?: number; colorCount?: number; ditherStrength?: number }) => void;
+  gammaCorrection: boolean;
+  onUpdate: (partial: { width?: number; height?: number; ditherScale?: number; colorCount?: number; ditherStrength?: number; gammaCorrection?: boolean }) => void;
 }
 
-export function OutputControls({ width, height, ditherScale, colorCount, ditherStrength, onUpdate }: OutputControlsProps) {
+export function OutputControls({ width, height, ditherScale, colorCount, ditherStrength, gammaCorrection, onUpdate }: OutputControlsProps) {
   return (
     <div className="control-group">
       <h3>Output</h3>
@@ -50,12 +51,12 @@ export function OutputControls({ width, height, ditherScale, colorCount, ditherS
       </label>
 
       <label>
-        Colors per Channel
+        Colors
         <div className="range-row">
           <input
             type="range"
-            min={2}
-            max={32}
+            min={1}
+            max={64}
             value={colorCount}
             onChange={(e) => onUpdate({ colorCount: Number(e.target.value) })}
           />
@@ -75,6 +76,15 @@ export function OutputControls({ width, height, ditherScale, colorCount, ditherS
           />
           <span className="range-value">{Math.round(ditherStrength * 100)}%</span>
         </div>
+      </label>
+
+      <label className="checkbox-row">
+        <input
+          type="checkbox"
+          checked={gammaCorrection}
+          onChange={(e) => onUpdate({ gammaCorrection: e.target.checked })}
+        />
+        Gamma Correction
       </label>
     </div>
   );

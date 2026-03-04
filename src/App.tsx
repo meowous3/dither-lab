@@ -21,16 +21,17 @@ export function App() {
         <SourcePicker
           sourceType={state.sourceType}
           imageName={state.imageName}
+          imagePaletteMode={state.imagePaletteMode}
           onSelectGradient={clearImage}
           onUploadImage={uploadImage}
+          onPaletteModeChange={(imagePaletteMode) => update({ imagePaletteMode })}
         />
-        {state.sourceType === 'gradient' && (
-          <PresetBar
-            onApply={(partial) => {
-              update(partial);
-            }}
-          />
-        )}
+        <PresetBar
+          sourceType={state.sourceType}
+          onApply={(partial) => {
+            update(partial);
+          }}
+        />
         {state.sourceType === 'gradient' && (
           <GradientControls gradient={state.gradient} onUpdate={updateGradient} />
         )}
@@ -44,6 +45,7 @@ export function App() {
           ditherScale={state.ditherScale}
           colorCount={state.colorCount}
           ditherStrength={state.ditherStrength}
+          gammaCorrection={state.gammaCorrection}
           onUpdate={update}
         />
         <ColorPaletteEditor

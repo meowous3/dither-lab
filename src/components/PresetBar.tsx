@@ -1,7 +1,8 @@
 import type { DitherState } from '../hooks/useDitherEngine';
-import type { DitherAlgorithm, ColorSpace } from '../engine/types';
+import type { DitherAlgorithm, ColorSpace, ImagePaletteMode } from '../engine/types';
 
 interface PresetBarProps {
+  sourceType: 'gradient' | 'image';
   onApply: (partial: Partial<DitherState>) => void;
 }
 
@@ -10,7 +11,7 @@ interface Preset {
   state: Partial<DitherState>;
 }
 
-const PRESETS: Preset[] = [
+const GRADIENT_PRESETS: Preset[] = [
   {
     name: '1-bit',
     state: {
@@ -112,9 +113,66 @@ const PRESETS: Preset[] = [
   },
 ];
 
-const ALGORITHMS: DitherAlgorithm[] = ['bayer2x2', 'bayer4x4', 'bayer8x8', 'floyd-steinberg', 'atkinson', 'sierra-lite', 'blue-noise'];
+const IMAGE_PRESETS: Preset[] = [
+  {
+    name: 'Retro Mac',
+    state: {
+      algorithm: 'atkinson',
+      ditherScale: 1,
+      imagePaletteMode: 'monochrome' as ImagePaletteMode,
+      palette: undefined,
+    },
+  },
+  {
+    name: 'Game Boy',
+    state: {
+      algorithm: 'bayer4x4',
+      ditherScale: 2,
+      imagePaletteMode: 'gameboy' as ImagePaletteMode,
+      palette: undefined,
+    },
+  },
+  {
+    name: 'CGA',
+    state: {
+      algorithm: 'floyd-steinberg',
+      ditherScale: 1,
+      imagePaletteMode: 'cga' as ImagePaletteMode,
+      palette: undefined,
+    },
+  },
+  {
+    name: 'PICO-8',
+    state: {
+      algorithm: 'bayer8x8',
+      ditherScale: 2,
+      imagePaletteMode: 'pico8' as ImagePaletteMode,
+      palette: undefined,
+    },
+  },
+  {
+    name: 'C64',
+    state: {
+      algorithm: 'jarvis-judice-ninke',
+      ditherScale: 1,
+      imagePaletteMode: 'commodore64' as ImagePaletteMode,
+      palette: undefined,
+    },
+  },
+];
+
+const ALGORITHMS: DitherAlgorithm[] = [
+  'bayer2x2', 'bayer4x4', 'bayer8x8',
+  'floyd-steinberg', 'jarvis-judice-ninke', 'stucki', 'atkinson', 'burkes',
+  'sierra', 'sierra-two-row', 'sierra-lite', 'blue-noise',
+];
 const GRADIENT_TYPES = ['linear', 'radial', 'conic', 'diamond', 'square', 'spiral'] as const;
 const COLOR_SPACES: ColorSpace[] = ['rgb', 'hsl', 'oklab', 'oklch'];
+const IMAGE_PALETTE_MODES: ImagePaletteMode[] = [
+  'median-cut', 'k-means', 'octree', 'popularity',
+  'uniform', 'grayscale', 'monochrome', 'sepia',
+  'cga', 'gameboy', 'commodore64', 'nes', 'pico8',
+];
 
 function randomColor(): { r: number; g: number; b: number } {
   return {
@@ -124,7 +182,7 @@ function randomColor(): { r: number; g: number; b: number } {
   };
 }
 
-function randomPreset(): Partial<DitherState> {
+function randomGradientPreset(): Partial<DitherState> {
   const stopCount = 2 + Math.floor(Math.random() * 3); // 2-4 stops
   const stops = Array.from({ length: stopCount }, (_, i) => ({
     position: i / (stopCount - 1),
@@ -145,17 +203,31 @@ function randomPreset(): Partial<DitherState> {
   };
 }
 
-export function PresetBar({ onApply }: PresetBarProps) {
+function randomImagePreset(): Partial<DitherState> {
+  return {
+    colorCount: 2 + Math.floor(Math.random() * 15), // 2-16
+    algorithm: ALGORITHMS[Math.floor(Math.random() * ALGORITHMS.length)],
+    ditherScale: 1 + Math.floor(Math.random() * 4), // 1-4
+    ditherStrength: 0.5 + Math.random(), // 0.5-1.5
+    imagePaletteMode: IMAGE_PALETTE_MODES[Math.floor(Math.random() * IMAGE_PALETTE_MODES.length)],
+    palette: undefined,
+  };
+}
+
+export function PresetBar({ sourceType, onApply }: PresetBarProps) {
+  const presets = sourceType === 'gradient' ? GRADIENT_PRESETS : IMAGE_PRESETS;
+  const randomFn = sourceType === 'gradient' ? randomGradientPreset : randomImagePreset;
+
   return (
     <div className="control-group">
       <h3>Presets</h3>
       <div className="preset-bar">
-        {PRESETS.map((p) => (
+        {presets.map((p) => (
           <button key={p.name} onClick={() => onApply(p.state)} className="preset-bar-btn">
             {p.name}
           </button>
         ))}
-        <button onClick={() => onApply(randomPreset())} className="preset-bar-btn">
+        <button onClick={() => onApply(randomFn())} className="preset-bar-btn">
           Random
         </button>
       </div>

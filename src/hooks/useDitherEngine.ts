@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { dither } from '../engine/dither';
 import { useDebounce } from './useDebounce';
-import type { DitherAlgorithm, DitherParams, DitherResult, DitherSource, GradientConfig, Color } from '../engine/types';
+import type { DitherAlgorithm, DitherParams, DitherResult, DitherSource, GradientConfig, Color, ImagePaletteMode } from '../engine/types';
 
 export interface DitherState {
   width: number;
@@ -11,6 +11,8 @@ export interface DitherState {
   ditherScale: number;
   colorCount: number;
   ditherStrength: number;
+  gammaCorrection: boolean;
+  imagePaletteMode: ImagePaletteMode;
   palette: Color[] | undefined;
   sourceType: 'gradient' | 'image';
   imageBuffer: Float32Array | null;
@@ -33,6 +35,8 @@ const DEFAULT_STATE: DitherState = {
   ditherScale: 1,
   colorCount: 2,
   ditherStrength: 1,
+  gammaCorrection: false,
+  imagePaletteMode: 'median-cut',
   palette: undefined,
   sourceType: 'gradient',
   imageBuffer: null,
@@ -48,7 +52,7 @@ export function useDitherEngine() {
   const debouncedState = useDebounce(state, 50);
 
   useEffect(() => {
-    const { sourceType, imageBuffer, gradient, width, height, algorithm, ditherScale, colorCount, ditherStrength, palette } = debouncedState;
+    const { sourceType, imageBuffer, gradient, width, height, algorithm, ditherScale, colorCount, ditherStrength, gammaCorrection, imagePaletteMode, palette } = debouncedState;
 
     // Skip if image mode but no image loaded yet
     if (sourceType === 'image' && !imageBuffer) return;
@@ -68,6 +72,8 @@ export function useDitherEngine() {
       ditherScale,
       colorCount,
       ditherStrength,
+      gammaCorrection,
+      imagePaletteMode,
       palette,
     };
 
@@ -80,7 +86,15 @@ export function useDitherEngine() {
   }, [debouncedState]);
 
   const update = useCallback((partial: Partial<DitherState>) => {
-    setState((prev) => ({ ...prev, ...partial }));
+    setState((prev) => {
+      const next = { ...prev, ...partial };
+      // When colorCount changes without an explicit palette in the update,
+      // clear any preset palette so auto-generation uses the new count
+      if ('colorCount' in partial && !('palette' in partial) && prev.palette) {
+        next.palette = undefined;
+      }
+      return next;
+    });
   }, []);
 
   const updateGradient = useCallback((partial: Partial<GradientConfig>) => {

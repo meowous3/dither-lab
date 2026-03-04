@@ -1,9 +1,15 @@
 export type DitherAlgorithm =
+  | 'none'
   | 'bayer2x2'
   | 'bayer4x4'
   | 'bayer8x8'
   | 'floyd-steinberg'
+  | 'jarvis-judice-ninke'
+  | 'stucki'
   | 'atkinson'
+  | 'burkes'
+  | 'sierra'
+  | 'sierra-two-row'
   | 'sierra-lite'
   | 'blue-noise';
 
@@ -27,6 +33,22 @@ export interface GradientConfig {
   colorSpace: ColorSpace;
 }
 
+export type ImagePaletteMode =
+  | 'median-cut'
+  | 'k-means'
+  | 'octree'
+  | 'popularity'
+  | 'uniform'
+  | 'grayscale'
+  | 'monochrome'
+  | 'cga'
+  | 'gameboy'
+  | 'commodore64'
+  | 'nes'
+  | 'pico8'
+  | 'websafe'
+  | 'sepia';
+
 export type DitherSource =
   | { type: 'gradient'; gradient: GradientConfig }
   | { type: 'image'; imageBuffer: Float32Array };
@@ -39,6 +61,8 @@ export interface DitherParams {
   ditherScale: number;   // pixel block size 1-16
   colorCount: number;    // quantization levels per channel
   ditherStrength: number; // transition width multiplier (0 = hard bands, 1 = normal)
+  gammaCorrection: boolean; // linearize before dithering for perceptual accuracy
+  imagePaletteMode: ImagePaletteMode; // palette generation mode for images
   palette?: Color[];     // optional fixed palette
 }
 
