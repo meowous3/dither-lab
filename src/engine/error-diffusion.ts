@@ -1,8 +1,8 @@
 // Unified error diffusion dithering engine
 // All algorithms use serpentine scanning (alternating row direction)
 
-import { quantizeChannel, findClosestPaletteColor } from './quantize';
-import type { Color } from './types';
+import { quantizeChannel, findClosestPaletteColor, findTwoClosestPaletteColors, pixelHash } from './quantize';
+import type { Color, DitherTechnique } from './types';
 
 interface KernelEntry {
   dx: number;
@@ -121,23 +121,82 @@ export function errorDiffusionDither(
   height: number,
   colorCount: number,
   ditherStrength: number = 1,
-  palette?: Color[]
+  palette?: Color[],
+  technique: DitherTechnique = 'continuous',
+  edgeMap?: Float32Array,
+  directionAngle: number = 0
 ): void {
   const kernel = KERNELS[algorithmName];
   if (!kernel) throw new Error(`Unknown error diffusion algorithm: ${algorithmName}`);
+
+  // Compute stable error propagation limit: strength * totalWeight must not exceed 1.0
+  const totalKernelWeight = kernel.reduce((s, e) => s + e.weight, 0);
+  const stableLimit = totalKernelWeight > 0 ? 1.0 / totalKernelWeight : 1.0;
+  const errorStrength = Math.min(ditherStrength, stableLimit);
+  // Excess strength beyond stable limit drives pre-quantization jitter
+  const excessStrength = Math.max(0, ditherStrength - stableLimit);
+
+  // Precompute direction vector for directional technique
+  const rad = directionAngle * Math.PI / 180;
+  const dirX = Math.cos(rad);
+  const dirY = Math.sin(rad);
+
+  // Intermediate needs original pixel values (before error accumulation)
+  // to find stable two-color candidates that don't shift as error propagates
+  const origBuf = technique === 'intermediate' ? new Float32Array(buf) : null;
 
   for (let y = 0; y < height; y++) {
     const leftToRight = y % 2 === 0;
     for (let i = 0; i < width; i++) {
       const x = leftToRight ? i : width - 1 - i;
       const idx = (y * width + x) * 3;
-      // Clamp before quantizing to prevent runaway error accumulation at high strength
-      const oldR = Math.max(0, Math.min(1, buf[idx]));
-      const oldG = Math.max(0, Math.min(1, buf[idx + 1]));
-      const oldB = Math.max(0, Math.min(1, buf[idx + 2]));
+      // Clamp before quantizing to prevent runaway error accumulation
+      let oldR = Math.max(0, Math.min(1, buf[idx]));
+      let oldG = Math.max(0, Math.min(1, buf[idx + 1]));
+      let oldB = Math.max(0, Math.min(1, buf[idx + 2]));
+
+      // Excess strength beyond stable limit adds per-pixel jitter
+      if (excessStrength > 0) {
+        const jitter = (pixelHash(x, y) - 0.5) * 0.3 * excessStrength;
+        oldR = Math.max(0, Math.min(1, oldR + jitter));
+        oldG = Math.max(0, Math.min(1, oldG + jitter));
+        oldB = Math.max(0, Math.min(1, oldB + jitter));
+      }
+
+      // Noise-modulated: add per-pixel jitter before quantizing
+      if (technique === 'noise-modulated') {
+        const jitter = (pixelHash(x, y) - 0.5) * 0.15 * ditherStrength;
+        oldR = Math.max(0, Math.min(1, oldR + jitter));
+        oldG = Math.max(0, Math.min(1, oldG + jitter));
+        oldB = Math.max(0, Math.min(1, oldB + jitter));
+      }
 
       let newR: number, newG: number, newB: number;
-      if (palette) {
+
+      if (technique === 'intermediate' && origBuf) {
+        // Find two candidate colors from ORIGINAL pixel (no error),
+        // then let accumulated error decide which to pick.
+        // This prevents error from jumping to distant wrong palette colors.
+        if (palette) {
+          const [a, bCol] = findTwoClosestPaletteColors(
+            origBuf[idx], origBuf[idx + 1], origBuf[idx + 2], palette
+          );
+          // Use error-adjusted pixel to decide between the two candidates
+          const da = (oldR - a.r / 255) ** 2 + (oldG - a.g / 255) ** 2 + (oldB - a.b / 255) ** 2;
+          const db = (oldR - bCol.r / 255) ** 2 + (oldG - bCol.g / 255) ** 2 + (oldB - bCol.b / 255) ** 2;
+          const pick = db < da ? bCol : a;
+          newR = pick.r / 255; newG = pick.g / 255; newB = pick.b / 255;
+        } else {
+          const n = colorCount - 1;
+          if (n <= 0) {
+            newR = newG = newB = 0;
+          } else {
+            newR = intermediateChannel(oldR, n);
+            newG = intermediateChannel(oldG, n);
+            newB = intermediateChannel(oldB, n);
+          }
+        }
+      } else if (palette) {
         const c = findClosestPaletteColor(oldR, oldG, oldB, palette);
         newR = c.r / 255; newG = c.g / 255; newB = c.b / 255;
       } else {
@@ -150,21 +209,73 @@ export function errorDiffusionDither(
       buf[idx + 1] = newG;
       buf[idx + 2] = newB;
 
-      const errR = (oldR - newR) * ditherStrength;
-      const errG = (oldG - newG) * ditherStrength;
-      const errB = (oldB - newB) * ditherStrength;
+      let errR = (oldR - newR) * errorStrength;
+      let errG = (oldG - newG) * errorStrength;
+      let errB = (oldB - newB) * errorStrength;
+
+      // Edge-aware: reduce error at edges
+      if (technique === 'edge-aware' && edgeMap) {
+        const edgeFactor = 1 - edgeMap[y * width + x];
+        errR *= edgeFactor;
+        errG *= edgeFactor;
+        errB *= edgeFactor;
+      }
 
       const dir = leftToRight ? 1 : -1;
-      for (const entry of kernel) {
-        const nx = x + entry.dx * dir;
-        const ny = y + entry.dy;
-        if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-          const ni = (ny * width + nx) * 3;
-          buf[ni]     += errR * entry.weight;
-          buf[ni + 1] += errG * entry.weight;
-          buf[ni + 2] += errB * entry.weight;
+
+      if (technique === 'directional') {
+        // Weight kernel entries by alignment with direction angle
+        let totalWeight = 0;
+        const modifiedWeights: number[] = [];
+        for (const entry of kernel) {
+          const edx = entry.dx * dir;
+          const edy = entry.dy;
+          const len = Math.sqrt(edx * edx + edy * edy);
+          let alignment = 0;
+          if (len > 0) {
+            alignment = (edx * dirX + edy * dirY) / len;
+          }
+          const modifier = Math.max(0.1, (1 + alignment) / 2);
+          const w = entry.weight * modifier;
+          modifiedWeights.push(w);
+          totalWeight += w;
+        }
+        // Renormalize to preserve original total weight sum
+        const origTotal = kernel.reduce((s, e) => s + e.weight, 0);
+        const scale = totalWeight > 0 ? origTotal / totalWeight : 0;
+        for (let k = 0; k < kernel.length; k++) {
+          const entry = kernel[k];
+          const nx = x + entry.dx * dir;
+          const ny = y + entry.dy;
+          if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+            const ni = (ny * width + nx) * 3;
+            const w = modifiedWeights[k] * scale;
+            buf[ni]     += errR * w;
+            buf[ni + 1] += errG * w;
+            buf[ni + 2] += errB * w;
+          }
+        }
+      } else {
+        for (const entry of kernel) {
+          const nx = x + entry.dx * dir;
+          const ny = y + entry.dy;
+          if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+            const ni = (ny * width + nx) * 3;
+            buf[ni]     += errR * entry.weight;
+            buf[ni + 1] += errG * entry.weight;
+            buf[ni + 2] += errB * entry.weight;
+          }
         }
       }
     }
   }
+}
+
+/** Intermediate quantization for a single channel (non-palette path) */
+function intermediateChannel(v: number, n: number): number {
+  const scaled = v * n;
+  const lo = Math.floor(scaled) / n;
+  const hi = Math.min(Math.ceil(scaled) / n, 1);
+  const blend = scaled - Math.floor(scaled);
+  return blend > 0.5 ? hi : lo;
 }

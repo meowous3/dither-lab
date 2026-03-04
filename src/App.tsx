@@ -3,6 +3,7 @@ import { Preview } from './components/Preview';
 import { SourcePicker } from './components/SourcePicker';
 import { GradientControls } from './components/GradientControls';
 import { AlgorithmPicker } from './components/AlgorithmPicker';
+import { TechniquePicker } from './components/TechniquePicker';
 import { OutputControls } from './components/OutputControls';
 import { DownloadBar } from './components/DownloadBar';
 import { ColorPaletteEditor } from './components/ColorPaletteEditor';
@@ -38,6 +39,12 @@ export function App() {
         <AlgorithmPicker
           value={state.algorithm}
           onChange={(algorithm) => update({ algorithm })}
+        />
+        <TechniquePicker
+          value={state.ditherTechnique}
+          directionAngle={state.directionAngle}
+          onChange={(ditherTechnique) => update({ ditherTechnique })}
+          onAngleChange={(directionAngle) => update({ directionAngle })}
         />
         <OutputControls
           width={state.width}

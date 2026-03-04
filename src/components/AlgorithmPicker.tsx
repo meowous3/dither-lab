@@ -1,4 +1,5 @@
 import type { DitherAlgorithm } from '../engine/types';
+import { CollapsibleGroup } from './CollapsibleGroup';
 
 interface AlgorithmPickerProps {
   value: DitherAlgorithm;
@@ -23,8 +24,7 @@ const ALGORITHMS: { id: DitherAlgorithm; label: string; desc: string }[] = [
 
 export function AlgorithmPicker({ value, onChange }: AlgorithmPickerProps) {
   return (
-    <div className="control-group">
-      <h3>Algorithm</h3>
+    <CollapsibleGroup title="Algorithm">
       <div className="algorithm-grid">
         {ALGORITHMS.map((alg) => (
           <button
@@ -38,6 +38,6 @@ export function AlgorithmPicker({ value, onChange }: AlgorithmPickerProps) {
           </button>
         ))}
       </div>
-    </div>
+    </CollapsibleGroup>
   );
 }

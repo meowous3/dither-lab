@@ -13,6 +13,14 @@ export type DitherAlgorithm =
   | 'sierra-lite'
   | 'blue-noise';
 
+export type DitherTechnique =
+  | 'reduce-only'
+  | 'intermediate'
+  | 'continuous'
+  | 'noise-modulated'
+  | 'edge-aware'
+  | 'directional';
+
 export interface Color {
   r: number; // 0-255
   g: number;
@@ -46,6 +54,7 @@ export type ImagePaletteMode =
   | 'commodore64'
   | 'nes'
   | 'pico8'
+  | 'pc9801'
   | 'websafe'
   | 'sepia';
 
@@ -64,6 +73,8 @@ export interface DitherParams {
   gammaCorrection: boolean; // linearize before dithering for perceptual accuracy
   imagePaletteMode: ImagePaletteMode; // palette generation mode for images
   palette?: Color[];     // optional fixed palette
+  ditherTechnique: DitherTechnique; // how the algorithm applies dithering
+  directionAngle: number; // 0-360, for directional technique
 }
 
 export interface DitherResult {

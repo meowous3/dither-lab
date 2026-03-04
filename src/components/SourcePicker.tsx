@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import type { ImagePaletteMode } from '../engine/types';
+import { CollapsibleGroup } from './CollapsibleGroup';
 
 interface SourcePickerProps {
   sourceType: 'gradient' | 'image';
@@ -37,8 +38,7 @@ export function SourcePicker({ sourceType, imageName, imagePaletteMode, onSelect
   }, []);
 
   return (
-    <div className="control-group">
-      <h3>Source</h3>
+    <CollapsibleGroup title="Source">
       <div className="source-tabs">
         <button
           className={`source-tab ${sourceType === 'gradient' ? 'active' : ''}`}
@@ -92,6 +92,7 @@ export function SourcePicker({ sourceType, imageName, imagePaletteMode, onSelect
                 <option value="commodore64">Commodore 64 (16)</option>
                 <option value="nes">NES (54)</option>
                 <option value="pico8">PICO-8 (16)</option>
+                <option value="pc9801">PC-9801 (8)</option>
               </optgroup>
             </select>
           </label>
@@ -108,6 +109,6 @@ export function SourcePicker({ sourceType, imageName, imagePaletteMode, onSelect
           e.target.value = '';
         }}
       />
-    </div>
+    </CollapsibleGroup>
   );
 }

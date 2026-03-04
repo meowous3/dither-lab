@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Color } from '../engine/types';
+import { CollapsibleGroup } from './CollapsibleGroup';
 
 interface ColorPaletteEditorProps {
   palette: Color[] | undefined;
@@ -98,15 +99,14 @@ export function ColorPaletteEditor({ palette, onUpdate }: ColorPaletteEditorProp
     onUpdate(palette.filter((_, i) => i !== index));
   };
 
-  return (
-    <div className="control-group">
-      <div className="palette-header">
-        <h3>Custom Palette</h3>
-        <button onClick={toggle} className={`toggle-btn ${enabled ? 'active' : ''}`}>
-          {enabled ? 'ON' : 'OFF'}
-        </button>
-      </div>
+  const toggleBtn = (
+    <button onClick={toggle} className={`toggle-btn ${enabled ? 'active' : ''}`}>
+      {enabled ? 'ON' : 'OFF'}
+    </button>
+  );
 
+  return (
+    <CollapsibleGroup title="Custom Palette" defaultOpen={false} headerRight={toggleBtn}>
       {enabled && (
         <>
           <div className="preset-row">
@@ -148,6 +148,6 @@ export function ColorPaletteEditor({ palette, onUpdate }: ColorPaletteEditorProp
           )}
         </>
       )}
-    </div>
+    </CollapsibleGroup>
   );
 }

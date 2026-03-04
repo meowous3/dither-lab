@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { dither } from '../engine/dither';
 import { useDebounce } from './useDebounce';
-import type { DitherAlgorithm, DitherParams, DitherResult, DitherSource, GradientConfig, Color, ImagePaletteMode } from '../engine/types';
+import type { DitherAlgorithm, DitherTechnique, DitherParams, DitherResult, DitherSource, GradientConfig, Color, ImagePaletteMode } from '../engine/types';
 
 export interface DitherState {
   width: number;
@@ -14,6 +14,8 @@ export interface DitherState {
   gammaCorrection: boolean;
   imagePaletteMode: ImagePaletteMode;
   palette: Color[] | undefined;
+  ditherTechnique: DitherTechnique;
+  directionAngle: number;
   sourceType: 'gradient' | 'image';
   imageBuffer: Float32Array | null;
   imageName: string | null;
@@ -38,6 +40,8 @@ const DEFAULT_STATE: DitherState = {
   gammaCorrection: false,
   imagePaletteMode: 'median-cut',
   palette: undefined,
+  ditherTechnique: 'intermediate',
+  directionAngle: 0,
   sourceType: 'gradient',
   imageBuffer: null,
   imageName: null,
@@ -52,7 +56,7 @@ export function useDitherEngine() {
   const debouncedState = useDebounce(state, 50);
 
   useEffect(() => {
-    const { sourceType, imageBuffer, gradient, width, height, algorithm, ditherScale, colorCount, ditherStrength, gammaCorrection, imagePaletteMode, palette } = debouncedState;
+    const { sourceType, imageBuffer, gradient, width, height, algorithm, ditherScale, colorCount, ditherStrength, gammaCorrection, imagePaletteMode, palette, ditherTechnique, directionAngle } = debouncedState;
 
     // Skip if image mode but no image loaded yet
     if (sourceType === 'image' && !imageBuffer) return;
@@ -75,6 +79,8 @@ export function useDitherEngine() {
       gammaCorrection,
       imagePaletteMode,
       palette,
+      ditherTechnique,
+      directionAngle,
     };
 
     dither(params).then((res) => {

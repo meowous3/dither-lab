@@ -1,3 +1,5 @@
+import { CollapsibleGroup } from './CollapsibleGroup';
+
 interface OutputControlsProps {
   width: number;
   height: number;
@@ -10,9 +12,7 @@ interface OutputControlsProps {
 
 export function OutputControls({ width, height, ditherScale, colorCount, ditherStrength, gammaCorrection, onUpdate }: OutputControlsProps) {
   return (
-    <div className="control-group">
-      <h3>Output</h3>
-
+    <CollapsibleGroup title="Output">
       <div className="dimension-row">
         <label>
           Width
@@ -86,6 +86,6 @@ export function OutputControls({ width, height, ditherScale, colorCount, ditherS
         />
         Gamma Correction
       </label>
-    </div>
+    </CollapsibleGroup>
   );
 }

@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import type { DitherResult } from '../engine/types';
+import { CollapsibleGroup } from './CollapsibleGroup';
 import { renderPNG, estimatePNGSize } from '../renderers/png-renderer';
 import { renderSVG, estimateSVGSize } from '../renderers/svg-renderer';
 import { renderHTML } from '../renderers/html-renderer';
@@ -70,8 +71,7 @@ export function DownloadBar({ result, colorCount }: DownloadBarProps) {
   const svgEst = result ? formatSize(estimateSVGSize(result.width, result.height, colorCount)) : '—';
 
   return (
-    <div className="control-group download-bar">
-      <h3>Download</h3>
+    <CollapsibleGroup title="Download">
       <div className="download-buttons">
         <button onClick={handlePNG} disabled={!result || downloading === 'png'}>
           {downloading === 'png' ? 'Saving...' : `PNG (~${pngEst})`}
@@ -83,6 +83,6 @@ export function DownloadBar({ result, colorCount }: DownloadBarProps) {
           {downloading === 'html' ? 'Saving...' : 'HTML'}
         </button>
       </div>
-    </div>
+    </CollapsibleGroup>
   );
 }

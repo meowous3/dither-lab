@@ -3,8 +3,8 @@
 
 import { getBayerMatrix } from './bayer';
 import { quantizeChannel } from './quantize';
-import { findClosestPaletteColor } from './quantize';
-import type { Color } from './types';
+import { findClosestPaletteColor, findTwoClosestPaletteColors, pixelHash } from './quantize';
+import type { Color, DitherTechnique } from './types';
 
 /**
  * Apply ordered (Bayer) dithering to a gradient buffer in-place.
@@ -18,7 +18,9 @@ export function orderedDither(
   ditherScale: number,
   colorCount: number,
   ditherStrength: number = 1,
-  palette?: Color[]
+  palette?: Color[],
+  technique: DitherTechnique = 'continuous',
+  edgeMap?: Float32Array
 ): void {
   const matrix = getBayerMatrix(matrixSize);
   const size = matrix.length;
@@ -28,32 +30,72 @@ export function orderedDither(
       const idx = (y * width + x) * 3;
       const mx = Math.floor(x / ditherScale) % size;
       const my = Math.floor(y / ditherScale) % size;
-      const threshold = matrix[my][mx];
+      let threshold = matrix[my][mx];
 
-      let r = buf[idx];
-      let g = buf[idx + 1];
-      let b = buf[idx + 2];
+      const r = buf[idx];
+      const g = buf[idx + 1];
+      const b = buf[idx + 2];
 
-      if (palette) {
-        // Add threshold bias per channel then snap to closest palette color
-        const bias = (threshold - 0.5) / colorCount * ditherStrength;
-        const br = Math.max(0, Math.min(1, r + bias));
-        const bg = Math.max(0, Math.min(1, g + bias));
-        const bb = Math.max(0, Math.min(1, b + bias));
-        const c = findClosestPaletteColor(br, bg, bb, palette);
-        buf[idx]     = c.r / 255;
-        buf[idx + 1] = c.g / 255;
-        buf[idx + 2] = c.b / 255;
+      // Technique-specific strength modulation
+      let localStrength = ditherStrength;
+      if (technique === 'edge-aware' && edgeMap) {
+        localStrength = ditherStrength * (1 - edgeMap[y * width + x]);
+      }
+
+      // Noise-modulated: add per-pixel jitter to threshold
+      if (technique === 'noise-modulated') {
+        threshold += (pixelHash(x, y) - 0.5) * 0.5;
+        threshold = Math.max(0, Math.min(1, threshold));
+      }
+
+      if (technique === 'intermediate') {
+        // Intermediate: find 2 closest palette colors, threshold picks between them
+        if (palette) {
+          const [a, bCol, blend] = findTwoClosestPaletteColors(r, g, b, palette);
+          const pick = blend > threshold * localStrength ? bCol : a;
+          buf[idx]     = pick.r / 255;
+          buf[idx + 1] = pick.g / 255;
+          buf[idx + 2] = pick.b / 255;
+        } else {
+          const n = colorCount - 1;
+          if (n <= 0) {
+            buf[idx] = buf[idx + 1] = buf[idx + 2] = 0;
+            continue;
+          }
+          const qr = intermediateChannel(r, n, threshold, localStrength);
+          const qg = intermediateChannel(g, n, threshold, localStrength);
+          const qb = intermediateChannel(b, n, threshold, localStrength);
+          buf[idx]     = qr;
+          buf[idx + 1] = qg;
+          buf[idx + 2] = qb;
+        }
       } else {
-        // Standard ordered dither: add threshold before quantizing
-        const bias = (threshold - 0.5) / colorCount * ditherStrength;
-        r = Math.max(0, Math.min(1, quantizeChannel(r + bias, colorCount)));
-        g = Math.max(0, Math.min(1, quantizeChannel(g + bias, colorCount)));
-        b = Math.max(0, Math.min(1, quantizeChannel(b + bias, colorCount)));
-        buf[idx]     = r;
-        buf[idx + 1] = g;
-        buf[idx + 2] = b;
+        // Continuous (default), noise-modulated, edge-aware all use bias approach
+        if (palette) {
+          const bias = (threshold - 0.5) / colorCount * localStrength;
+          const br = Math.max(0, Math.min(1, r + bias));
+          const bg = Math.max(0, Math.min(1, g + bias));
+          const bb = Math.max(0, Math.min(1, b + bias));
+          const c = findClosestPaletteColor(br, bg, bb, palette);
+          buf[idx]     = c.r / 255;
+          buf[idx + 1] = c.g / 255;
+          buf[idx + 2] = c.b / 255;
+        } else {
+          const bias = (threshold - 0.5) / colorCount * localStrength;
+          buf[idx]     = Math.max(0, Math.min(1, quantizeChannel(r + bias, colorCount)));
+          buf[idx + 1] = Math.max(0, Math.min(1, quantizeChannel(g + bias, colorCount)));
+          buf[idx + 2] = Math.max(0, Math.min(1, quantizeChannel(b + bias, colorCount)));
+        }
       }
     }
   }
+}
+
+/** Intermediate dither for a single channel (non-palette path) */
+function intermediateChannel(v: number, n: number, threshold: number, strength: number): number {
+  const scaled = v * n;
+  const lo = Math.floor(scaled) / n;
+  const hi = Math.min(Math.ceil(scaled) / n, 1);
+  const blend = scaled - Math.floor(scaled); // fractional part
+  return blend > threshold * strength ? hi : lo;
 }

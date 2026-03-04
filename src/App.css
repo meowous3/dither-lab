@@ -99,7 +99,26 @@ body {
   letter-spacing: 0.08em;
   color: var(--fg2);
   font-weight: 500;
+  margin: 0;
 }
+
+/* Collapsible headers */
+.collapsible-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+.collapsible-header:hover h3 { color: var(--fg); }
+.collapse-arrow {
+  display: inline-block;
+  margin-right: 6px;
+  font-size: 10px;
+  transition: transform 0.15s;
+}
+.collapse-arrow.open { transform: rotate(90deg); }
+.control-group.collapsed { gap: 0; }
 
 /* Labels */
 label {

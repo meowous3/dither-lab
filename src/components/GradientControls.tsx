@@ -1,4 +1,5 @@
 import type { ColorSpace, GradientConfig, GradientStop } from '../engine/types';
+import { CollapsibleGroup } from './CollapsibleGroup';
 
 interface GradientControlsProps {
   gradient: GradientConfig;
@@ -39,9 +40,7 @@ export function GradientControls({ gradient, onUpdate }: GradientControlsProps) 
   };
 
   return (
-    <div className="control-group">
-      <h3>Gradient</h3>
-
+    <CollapsibleGroup title="Gradient">
       <label>
         Type
         <select
@@ -111,6 +110,6 @@ export function GradientControls({ gradient, onUpdate }: GradientControlsProps) 
           </div>
         ))}
       </div>
-    </div>
+    </CollapsibleGroup>
   );
 }
