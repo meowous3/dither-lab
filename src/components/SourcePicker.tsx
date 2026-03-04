@@ -9,27 +9,37 @@ interface SourcePickerProps {
   imagePaletteMode: ImagePaletteMode;
   onSelectGradient: () => void;
   onUploadImage: (file: File) => void;
+  onUploadImages?: (files: File[]) => void;
   onPaletteModeChange: (mode: ImagePaletteMode) => void;
+  bulkCount?: number;
   locks: Set<string>;
   toggleLock: (key: string) => void;
 }
 
-export function SourcePicker({ sourceType, imageName, imagePaletteMode, onSelectGradient, onUploadImage, onPaletteModeChange, locks, toggleLock }: SourcePickerProps) {
+export function SourcePicker({ sourceType, imageName, imagePaletteMode, onSelectGradient, onUploadImage, onUploadImages, onPaletteModeChange, bulkCount, locks, toggleLock }: SourcePickerProps) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const folderRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
-  const handleFile = useCallback((file: File) => {
-    if (file.type.startsWith('image/')) {
-      onUploadImage(file);
+  const handleFiles = useCallback((files: FileList | File[]) => {
+    const arr = Array.from(files).filter((f) => f.type.startsWith('image/'));
+    if (arr.length === 0) return;
+    if (arr.length === 1 && !bulkCount) {
+      onUploadImage(arr[0]);
+    } else if (onUploadImages) {
+      onUploadImages(arr);
+    } else {
+      onUploadImage(arr[0]);
     }
-  }, [onUploadImage]);
+  }, [onUploadImage, onUploadImages, bulkCount]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file) handleFile(file);
-  }, [handleFile]);
+    if (e.dataTransfer.files.length > 0) {
+      handleFiles(e.dataTransfer.files);
+    }
+  }, [handleFiles]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -55,6 +65,14 @@ export function SourcePicker({ sourceType, imageName, imagePaletteMode, onSelect
         >
           Image
         </button>
+        {onUploadImages && (
+          <button
+            className="source-tab"
+            onClick={() => folderRef.current?.click()}
+          >
+            Folder
+          </button>
+        )}
       </div>
       {sourceType === 'image' && (
         <>
@@ -65,9 +83,11 @@ export function SourcePicker({ sourceType, imageName, imagePaletteMode, onSelect
             onDragLeave={handleDragLeave}
             onClick={() => fileRef.current?.click()}
           >
-            {imageName
-              ? <span className="source-filename">{imageName}</span>
-              : <span className="source-hint">Drop image or click to browse</span>
+            {bulkCount && bulkCount > 1
+              ? <span className="source-bulk-count">{bulkCount} images loaded — drop more to add</span>
+              : imageName
+                ? <span className="source-filename">{imageName}</span>
+                : <span className="source-hint">Drop image(s) or click to browse</span>
             }
           </div>
           <label>
@@ -108,13 +128,29 @@ export function SourcePicker({ sourceType, imageName, imagePaletteMode, onSelect
         ref={fileRef}
         type="file"
         accept="image/*"
+        multiple
         style={{ display: 'none' }}
         onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) handleFile(file);
+          const files = e.target.files;
+          if (files && files.length > 0) handleFiles(files);
           e.target.value = '';
         }}
       />
+      {onUploadImages && (
+        <input
+          ref={folderRef}
+          type="file"
+          accept="image/*"
+          // @ts-expect-error webkitdirectory is non-standard
+          webkitdirectory=""
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const files = e.target.files;
+            if (files && files.length > 0) handleFiles(files);
+            e.target.value = '';
+          }}
+        />
+      )}
     </CollapsibleGroup>
   );
 }

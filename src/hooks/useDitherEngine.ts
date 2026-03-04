@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { dither } from '../engine/dither';
 import { useDebounce } from './useDebounce';
+import { loadImageFile } from '../lib/image-loader';
 import type { DitherAlgorithm, DitherTechnique, DitherParams, DitherResult, DitherSource, GradientConfig, Color, ImagePaletteMode } from '../engine/types';
 
 export interface DitherState {
@@ -111,37 +112,27 @@ export function useDitherEngine() {
   }, []);
 
   const uploadImage = useCallback((file: File) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d')!;
-      ctx.drawImage(img, 0, 0);
-      const imgData = ctx.getImageData(0, 0, img.width, img.height);
-      const pixels = imgData.data;
-
-      // Convert RGBA uint8 to RGB float32 (0-1)
-      const buf = new Float32Array(img.width * img.height * 3);
-      for (let i = 0; i < img.width * img.height; i++) {
-        buf[i * 3]     = pixels[i * 4]     / 255;
-        buf[i * 3 + 1] = pixels[i * 4 + 1] / 255;
-        buf[i * 3 + 2] = pixels[i * 4 + 2] / 255;
-      }
-
+    loadImageFile(file).then((loaded) => {
       setState((prev) => ({
         ...prev,
         sourceType: 'image',
-        imageBuffer: buf,
-        imageName: file.name,
-        width: img.width,
-        height: img.height,
+        imageBuffer: loaded.buffer,
+        imageName: loaded.name,
+        width: loaded.width,
+        height: loaded.height,
       }));
+    });
+  }, []);
 
-      URL.revokeObjectURL(url);
-    };
-    img.src = url;
+  const loadBuffer = useCallback((buffer: Float32Array, width: number, height: number, name: string) => {
+    setState((prev) => ({
+      ...prev,
+      sourceType: 'image',
+      imageBuffer: buffer,
+      imageName: name,
+      width,
+      height,
+    }));
   }, []);
 
   const clearImage = useCallback(() => {
@@ -153,5 +144,5 @@ export function useDitherEngine() {
     }));
   }, []);
 
-  return { state, result, rendering, update, updateGradient, uploadImage, clearImage };
+  return { state, result, rendering, update, updateGradient, uploadImage, loadBuffer, clearImage };
 }

@@ -8,6 +8,10 @@ import { renderHTML } from '../renderers/html-renderer';
 interface DownloadBarProps {
   result: DitherResult | null;
   colorCount: number;
+  bulkMode?: boolean;
+  onDownloadZip?: () => void;
+  zipProgress?: { current: number; total: number } | null;
+  imageName?: string | null;
 }
 
 function formatSize(bytes: number): string {
@@ -30,7 +34,14 @@ function downloadText(text: string, filename: string, mime: string) {
   downloadBlob(blob, filename);
 }
 
-export function DownloadBar({ result, colorCount }: DownloadBarProps) {
+function getDownloadName(imageName: string | null | undefined, ext: string): string {
+  if (imageName) {
+    return imageName.replace(/\.[^.]+$/, '') + ext;
+  }
+  return 'dithered-gradient' + ext;
+}
+
+export function DownloadBar({ result, colorCount, bulkMode, onDownloadZip, zipProgress, imageName }: DownloadBarProps) {
   const [downloading, setDownloading] = useState<string | null>(null);
 
   const handlePNG = useCallback(async () => {
@@ -38,22 +49,22 @@ export function DownloadBar({ result, colorCount }: DownloadBarProps) {
     setDownloading('png');
     try {
       const blob = await renderPNG(result.imageData);
-      downloadBlob(blob, 'dithered-gradient.png');
+      downloadBlob(blob, getDownloadName(imageName, '.png'));
     } finally {
       setDownloading(null);
     }
-  }, [result]);
+  }, [result, imageName]);
 
   const handleSVG = useCallback(() => {
     if (!result) return;
     setDownloading('svg');
     try {
       const svg = renderSVG(result.imageData);
-      downloadText(svg, 'dithered-gradient.svg', 'image/svg+xml');
+      downloadText(svg, getDownloadName(imageName, '.svg'), 'image/svg+xml');
     } finally {
       setDownloading(null);
     }
-  }, [result]);
+  }, [result, imageName]);
 
   const handleHTML = useCallback(() => {
     if (!result) return;
@@ -61,11 +72,11 @@ export function DownloadBar({ result, colorCount }: DownloadBarProps) {
     try {
       const svg = renderSVG(result.imageData);
       const html = renderHTML(svg, result.width, result.height);
-      downloadText(html, 'dithered-gradient.html', 'text/html');
+      downloadText(html, getDownloadName(imageName, '.html'), 'text/html');
     } finally {
       setDownloading(null);
     }
-  }, [result]);
+  }, [result, imageName]);
 
   const pngEst = result ? formatSize(estimatePNGSize(result.width, result.height)) : '—';
   const svgEst = result ? formatSize(estimateSVGSize(result.width, result.height, colorCount)) : '—';
@@ -83,6 +94,16 @@ export function DownloadBar({ result, colorCount }: DownloadBarProps) {
           {downloading === 'html' ? 'Saving...' : 'HTML'}
         </button>
       </div>
+      {bulkMode && onDownloadZip && (
+        <div className="download-buttons">
+          <button onClick={onDownloadZip} disabled={!!zipProgress}>
+            {zipProgress
+              ? <span className="zip-progress">ZIP ({zipProgress.current}/{zipProgress.total}...)</span>
+              : 'ZIP All'
+            }
+          </button>
+        </div>
+      )}
     </CollapsibleGroup>
   );
 }
