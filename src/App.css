@@ -378,6 +378,40 @@ input[type="color"] {
 .preset-bar-btn:hover {
   border-color: var(--accent);
 }
+.preset-bar-random {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.random-icon {
+  flex-shrink: 0;
+}
+
+/* Lock toggles */
+.lock-toggle {
+  background: none;
+  border: none;
+  color: var(--fg2);
+  cursor: pointer;
+  padding: 2px;
+  opacity: 0.3;
+  transition: opacity 0.1s, color 0.1s;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.lock-toggle:hover {
+  opacity: 0.6;
+}
+.lock-toggle.locked {
+  color: var(--accent);
+  opacity: 1;
+}
+.label-with-lock {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
 
 /* Source picker */
 .source-tabs {

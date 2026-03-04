@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import type { ImagePaletteMode } from '../engine/types';
 import { CollapsibleGroup } from './CollapsibleGroup';
+import { LockToggle } from './LockToggle';
 
 interface SourcePickerProps {
   sourceType: 'gradient' | 'image';
@@ -9,9 +10,11 @@ interface SourcePickerProps {
   onSelectGradient: () => void;
   onUploadImage: (file: File) => void;
   onPaletteModeChange: (mode: ImagePaletteMode) => void;
+  locks: Set<string>;
+  toggleLock: (key: string) => void;
 }
 
-export function SourcePicker({ sourceType, imageName, imagePaletteMode, onSelectGradient, onUploadImage, onPaletteModeChange }: SourcePickerProps) {
+export function SourcePicker({ sourceType, imageName, imagePaletteMode, onSelectGradient, onUploadImage, onPaletteModeChange, locks, toggleLock }: SourcePickerProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
@@ -68,7 +71,10 @@ export function SourcePicker({ sourceType, imageName, imagePaletteMode, onSelect
             }
           </div>
           <label>
-            Palette Mode
+            <span className="label-with-lock">
+              Palette Mode
+              <LockToggle locked={locks.has('imagePaletteMode')} onToggle={() => toggleLock('imagePaletteMode')} />
+            </span>
             <select
               value={imagePaletteMode}
               onChange={(e) => onPaletteModeChange(e.target.value as ImagePaletteMode)}

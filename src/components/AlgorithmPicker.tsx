@@ -1,9 +1,12 @@
 import type { DitherAlgorithm } from '../engine/types';
 import { CollapsibleGroup } from './CollapsibleGroup';
+import { LockToggle } from './LockToggle';
 
 interface AlgorithmPickerProps {
   value: DitherAlgorithm;
   onChange: (alg: DitherAlgorithm) => void;
+  locks: Set<string>;
+  toggleLock: (key: string) => void;
 }
 
 const ALGORITHMS: { id: DitherAlgorithm; label: string; desc: string }[] = [
@@ -22,9 +25,9 @@ const ALGORITHMS: { id: DitherAlgorithm; label: string; desc: string }[] = [
   { id: 'blue-noise',         label: 'Blue Noise',           desc: 'Organic, no visible grid' },
 ];
 
-export function AlgorithmPicker({ value, onChange }: AlgorithmPickerProps) {
+export function AlgorithmPicker({ value, onChange, locks, toggleLock }: AlgorithmPickerProps) {
   return (
-    <CollapsibleGroup title="Algorithm">
+    <CollapsibleGroup title="Algorithm" headerRight={<LockToggle locked={locks.has('algorithm')} onToggle={() => toggleLock('algorithm')} />}>
       <div className="algorithm-grid">
         {ALGORITHMS.map((alg) => (
           <button

@@ -1,4 +1,5 @@
 import { CollapsibleGroup } from './CollapsibleGroup';
+import { LockToggle } from './LockToggle';
 
 interface OutputControlsProps {
   width: number;
@@ -8,9 +9,11 @@ interface OutputControlsProps {
   ditherStrength: number;
   gammaCorrection: boolean;
   onUpdate: (partial: { width?: number; height?: number; ditherScale?: number; colorCount?: number; ditherStrength?: number; gammaCorrection?: boolean }) => void;
+  locks: Set<string>;
+  toggleLock: (key: string) => void;
 }
 
-export function OutputControls({ width, height, ditherScale, colorCount, ditherStrength, gammaCorrection, onUpdate }: OutputControlsProps) {
+export function OutputControls({ width, height, ditherScale, colorCount, ditherStrength, gammaCorrection, onUpdate, locks, toggleLock }: OutputControlsProps) {
   return (
     <CollapsibleGroup title="Output">
       <div className="dimension-row">
@@ -37,7 +40,10 @@ export function OutputControls({ width, height, ditherScale, colorCount, ditherS
       </div>
 
       <label>
-        Dither Scale
+        <span className="label-with-lock">
+          Dither Scale
+          <LockToggle locked={locks.has('ditherScale')} onToggle={() => toggleLock('ditherScale')} />
+        </span>
         <div className="range-row">
           <input
             type="range"
@@ -51,7 +57,10 @@ export function OutputControls({ width, height, ditherScale, colorCount, ditherS
       </label>
 
       <label>
-        Colors
+        <span className="label-with-lock">
+          Colors
+          <LockToggle locked={locks.has('colorCount')} onToggle={() => toggleLock('colorCount')} />
+        </span>
         <div className="range-row">
           <input
             type="range"
@@ -65,7 +74,10 @@ export function OutputControls({ width, height, ditherScale, colorCount, ditherS
       </label>
 
       <label>
-        Transition
+        <span className="label-with-lock">
+          Transition
+          <LockToggle locked={locks.has('ditherStrength')} onToggle={() => toggleLock('ditherStrength')} />
+        </span>
         <div className="range-row">
           <input
             type="range"

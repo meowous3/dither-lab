@@ -1,9 +1,12 @@
 import type { ColorSpace, GradientConfig, GradientStop } from '../engine/types';
 import { CollapsibleGroup } from './CollapsibleGroup';
+import { LockToggle } from './LockToggle';
 
 interface GradientControlsProps {
   gradient: GradientConfig;
   onUpdate: (partial: Partial<GradientConfig>) => void;
+  locks: Set<string>;
+  toggleLock: (key: string) => void;
 }
 
 function colorToHex(c: { r: number; g: number; b: number }): string {
@@ -17,7 +20,7 @@ function hexToColor(hex: string): { r: number; g: number; b: number } {
     : { r: 0, g: 0, b: 0 };
 }
 
-export function GradientControls({ gradient, onUpdate }: GradientControlsProps) {
+export function GradientControls({ gradient, onUpdate, locks, toggleLock }: GradientControlsProps) {
   const updateStop = (index: number, partial: Partial<GradientStop>) => {
     const stops = gradient.stops.map((s, i) =>
       i === index ? { ...s, ...partial } : s
@@ -28,7 +31,6 @@ export function GradientControls({ gradient, onUpdate }: GradientControlsProps) 
   const addStop = () => {
     if (gradient.stops.length >= 8) return;
     const newPos = 0.5;
-    // Interpolate color at midpoint
     const stops = [...gradient.stops, { position: newPos, color: { r: 128, g: 128, b: 128 } }];
     stops.sort((a, b) => a.position - b.position);
     onUpdate({ stops });
@@ -42,7 +44,10 @@ export function GradientControls({ gradient, onUpdate }: GradientControlsProps) 
   return (
     <CollapsibleGroup title="Gradient">
       <label>
-        Type
+        <span className="label-with-lock">
+          Type
+          <LockToggle locked={locks.has('gradient.type')} onToggle={() => toggleLock('gradient.type')} />
+        </span>
         <select
           value={gradient.type}
           onChange={(e) => onUpdate({ type: e.target.value as GradientConfig['type'] })}
@@ -57,7 +62,10 @@ export function GradientControls({ gradient, onUpdate }: GradientControlsProps) 
       </label>
 
       <label>
-        Color Space
+        <span className="label-with-lock">
+          Color Space
+          <LockToggle locked={locks.has('gradient.colorSpace')} onToggle={() => toggleLock('gradient.colorSpace')} />
+        </span>
         <select
           value={gradient.colorSpace || 'rgb'}
           onChange={(e) => onUpdate({ colorSpace: e.target.value as ColorSpace })}
@@ -70,7 +78,10 @@ export function GradientControls({ gradient, onUpdate }: GradientControlsProps) 
       </label>
 
       <label>
-        Angle
+        <span className="label-with-lock">
+          Angle
+          <LockToggle locked={locks.has('gradient.angle')} onToggle={() => toggleLock('gradient.angle')} />
+        </span>
         <div className="range-row">
           <input
             type="range"
@@ -85,7 +96,10 @@ export function GradientControls({ gradient, onUpdate }: GradientControlsProps) 
 
       <div className="stops-list">
         <div className="stops-header">
-          <span>Color Stops</span>
+          <span className="label-with-lock">
+            Color Stops
+            <LockToggle locked={locks.has('gradient.stops')} onToggle={() => toggleLock('gradient.stops')} />
+          </span>
           <button onClick={addStop} disabled={gradient.stops.length >= 8} title="Add stop">+</button>
         </div>
         {gradient.stops.map((stop, i) => (

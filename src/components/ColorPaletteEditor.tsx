@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import type { Color } from '../engine/types';
 import { CollapsibleGroup } from './CollapsibleGroup';
+import { LockToggle } from './LockToggle';
 
 interface ColorPaletteEditorProps {
   palette: Color[] | undefined;
   onUpdate: (palette: Color[] | undefined) => void;
+  locks: Set<string>;
+  toggleLock: (key: string) => void;
 }
 
 interface Preset {
@@ -64,7 +67,7 @@ function hexToColor(hex: string): Color {
     : { r: 0, g: 0, b: 0 };
 }
 
-export function ColorPaletteEditor({ palette, onUpdate }: ColorPaletteEditorProps) {
+export function ColorPaletteEditor({ palette, onUpdate, locks, toggleLock }: ColorPaletteEditorProps) {
   const [enabled, setEnabled] = useState(!!palette);
 
   const toggle = () => {
@@ -99,14 +102,17 @@ export function ColorPaletteEditor({ palette, onUpdate }: ColorPaletteEditorProp
     onUpdate(palette.filter((_, i) => i !== index));
   };
 
-  const toggleBtn = (
-    <button onClick={toggle} className={`toggle-btn ${enabled ? 'active' : ''}`}>
-      {enabled ? 'ON' : 'OFF'}
-    </button>
+  const headerControls = (
+    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+      <LockToggle locked={locks.has('palette')} onToggle={() => toggleLock('palette')} />
+      <button onClick={toggle} className={`toggle-btn ${enabled ? 'active' : ''}`}>
+        {enabled ? 'ON' : 'OFF'}
+      </button>
+    </span>
   );
 
   return (
-    <CollapsibleGroup title="Custom Palette" defaultOpen={false} headerRight={toggleBtn}>
+    <CollapsibleGroup title="Custom Palette" defaultOpen={false} headerRight={headerControls}>
       {enabled && (
         <>
           <div className="preset-row">

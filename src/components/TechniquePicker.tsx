@@ -1,11 +1,14 @@
 import type { DitherTechnique } from '../engine/types';
 import { CollapsibleGroup } from './CollapsibleGroup';
+import { LockToggle } from './LockToggle';
 
 interface TechniquePickerProps {
   value: DitherTechnique;
   directionAngle: number;
   onChange: (technique: DitherTechnique) => void;
   onAngleChange: (angle: number) => void;
+  locks: Set<string>;
+  toggleLock: (key: string) => void;
 }
 
 const TECHNIQUES: { id: DitherTechnique; label: string; desc: string }[] = [
@@ -17,9 +20,9 @@ const TECHNIQUES: { id: DitherTechnique; label: string; desc: string }[] = [
   { id: 'directional',     label: 'Directional',     desc: 'Error follows an angle' },
 ];
 
-export function TechniquePicker({ value, directionAngle, onChange, onAngleChange }: TechniquePickerProps) {
+export function TechniquePicker({ value, directionAngle, onChange, onAngleChange, locks, toggleLock }: TechniquePickerProps) {
   return (
-    <CollapsibleGroup title="Technique">
+    <CollapsibleGroup title="Technique" headerRight={<LockToggle locked={locks.has('ditherTechnique')} onToggle={() => toggleLock('ditherTechnique')} />}>
       <div className="algorithm-grid">
         {TECHNIQUES.map((t) => (
           <button
@@ -35,7 +38,10 @@ export function TechniquePicker({ value, directionAngle, onChange, onAngleChange
       </div>
       {value === 'directional' && (
         <label>
-          Direction Angle
+          <span className="label-with-lock">
+            Direction Angle
+            <LockToggle locked={locks.has('directionAngle')} onToggle={() => toggleLock('directionAngle')} />
+          </span>
           <div className="range-row">
             <input
               type="range"
