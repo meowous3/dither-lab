@@ -211,7 +211,7 @@ function randomGradientPreset(): Partial<DitherState> {
     ditherScale: 1 + Math.floor(Math.random() * 4), // 1-4
     ditherStrength: 0.5 + Math.random(), // 0.5-1.5
     ditherTechnique: technique,
-    directionAngle: technique === 'directional' ? Math.floor(Math.random() * 360) : 0,
+    directionAngle: Math.floor(Math.random() * 360),
     palette: undefined,
     gradient: {
       type: GRADIENT_TYPES[Math.floor(Math.random() * GRADIENT_TYPES.length)],
@@ -230,7 +230,7 @@ function randomImagePreset(): Partial<DitherState> {
     ditherScale: 1 + Math.floor(Math.random() * 4), // 1-4
     ditherStrength: 0.5 + Math.random(), // 0.5-1.5
     ditherTechnique: technique,
-    directionAngle: technique === 'directional' ? Math.floor(Math.random() * 360) : 0,
+    directionAngle: Math.floor(Math.random() * 360),
     imagePaletteMode: IMAGE_PALETTE_MODES[Math.floor(Math.random() * IMAGE_PALETTE_MODES.length)],
     palette: undefined,
   };
