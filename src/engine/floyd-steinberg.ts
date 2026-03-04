@@ -1,5 +1,5 @@
 // Floyd-Steinberg error diffusion dithering
-// Full error propagation (100%)
+// Full error propagation (100%) with serpentine scanning
 //
 //        * 7/16
 //  3/16 5/16 1/16
@@ -12,10 +12,13 @@ export function floydSteinbergDither(
   width: number,
   height: number,
   colorCount: number,
+  ditherStrength: number = 1,
   palette?: Color[]
 ): void {
   for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
+    const leftToRight = y % 2 === 0;
+    for (let i = 0; i < width; i++) {
+      const x = leftToRight ? i : width - 1 - i;
       const idx = (y * width + x) * 3;
       const oldR = buf[idx];
       const oldG = buf[idx + 1];
@@ -35,15 +38,16 @@ export function floydSteinbergDither(
       buf[idx + 1] = newG;
       buf[idx + 2] = newB;
 
-      const errR = oldR - newR;
-      const errG = oldG - newG;
-      const errB = oldB - newB;
+      const errR = (oldR - newR) * ditherStrength;
+      const errG = (oldG - newG) * ditherStrength;
+      const errB = (oldB - newB) * ditherStrength;
 
-      // Distribute error to neighbors
-      distributeError(buf, width, height, x + 1, y,     errR, errG, errB, 7 / 16);
-      distributeError(buf, width, height, x - 1, y + 1, errR, errG, errB, 3 / 16);
-      distributeError(buf, width, height, x,     y + 1, errR, errG, errB, 5 / 16);
-      distributeError(buf, width, height, x + 1, y + 1, errR, errG, errB, 1 / 16);
+      // Flip horizontal offsets for right-to-left rows
+      const dir = leftToRight ? 1 : -1;
+      distributeError(buf, width, height, x + dir, y,     errR, errG, errB, 7 / 16);
+      distributeError(buf, width, height, x - dir, y + 1, errR, errG, errB, 3 / 16);
+      distributeError(buf, width, height, x,       y + 1, errR, errG, errB, 5 / 16);
+      distributeError(buf, width, height, x + dir, y + 1, errR, errG, errB, 1 / 16);
     }
   }
 }

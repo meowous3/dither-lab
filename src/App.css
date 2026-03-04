@@ -72,8 +72,6 @@ body {
 }
 
 .preview-canvas {
-  max-width: 90%;
-  max-height: 90%;
   background: repeating-conic-gradient(#222 0% 25%, #1a1a1a 0% 50%) 0 0 / 16px 16px;
   border: 1px solid var(--border);
 }
@@ -360,6 +358,48 @@ input[type="color"] {
 }
 .preset-bar-btn:hover {
   border-color: var(--accent);
+}
+
+/* Source picker */
+.source-tabs {
+  display: flex;
+  gap: 4px;
+}
+.source-tab {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--fg2);
+  border-radius: 4px;
+  padding: 6px 0;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.1s;
+}
+.source-tab:hover { border-color: var(--fg2); }
+.source-tab.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.source-dropzone {
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+  padding: 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.1s;
+  font-size: 12px;
+}
+.source-dropzone:hover,
+.source-dropzone.dragging {
+  border-color: var(--accent);
+}
+.source-filename {
+  color: var(--fg);
+}
+.source-hint {
+  color: var(--fg2);
 }
 
 /* Scrollbar */

@@ -1,6 +1,6 @@
 // Atkinson error diffusion dithering
 // Propagates only 75% of the error (6/8 = 75%), giving higher contrast
-// Classic Macintosh look
+// Classic Macintosh look — with serpentine scanning
 //
 //      * 1/8 1/8
 // 1/8 1/8 1/8
@@ -14,10 +14,13 @@ export function atkinsonDither(
   width: number,
   height: number,
   colorCount: number,
+  ditherStrength: number = 1,
   palette?: Color[]
 ): void {
   for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
+    const leftToRight = y % 2 === 0;
+    for (let i = 0; i < width; i++) {
+      const x = leftToRight ? i : width - 1 - i;
       const idx = (y * width + x) * 3;
       const oldR = buf[idx];
       const oldG = buf[idx + 1];
@@ -38,17 +41,19 @@ export function atkinsonDither(
       buf[idx + 2] = newB;
 
       // Atkinson distributes 1/8 to each of 6 neighbors (total 6/8 = 75%)
-      const errR = oldR - newR;
-      const errG = oldG - newG;
-      const errB = oldB - newB;
+      const errR = (oldR - newR) * ditherStrength;
+      const errG = (oldG - newG) * ditherStrength;
+      const errB = (oldB - newB) * ditherStrength;
       const f = 1 / 8;
 
-      distribute(buf, width, height, x + 1, y,     errR, errG, errB, f);
-      distribute(buf, width, height, x + 2, y,     errR, errG, errB, f);
-      distribute(buf, width, height, x - 1, y + 1, errR, errG, errB, f);
-      distribute(buf, width, height, x,     y + 1, errR, errG, errB, f);
-      distribute(buf, width, height, x + 1, y + 1, errR, errG, errB, f);
-      distribute(buf, width, height, x,     y + 2, errR, errG, errB, f);
+      // Flip horizontal offsets for right-to-left rows
+      const dir = leftToRight ? 1 : -1;
+      distribute(buf, width, height, x + dir,     y,     errR, errG, errB, f);
+      distribute(buf, width, height, x + 2 * dir, y,     errR, errG, errB, f);
+      distribute(buf, width, height, x - dir,     y + 1, errR, errG, errB, f);
+      distribute(buf, width, height, x,           y + 1, errR, errG, errB, f);
+      distribute(buf, width, height, x + dir,     y + 1, errR, errG, errB, f);
+      distribute(buf, width, height, x,           y + 2, errR, errG, errB, f);
     }
   }
 }

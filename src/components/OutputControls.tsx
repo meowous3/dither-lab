@@ -3,10 +3,11 @@ interface OutputControlsProps {
   height: number;
   ditherScale: number;
   colorCount: number;
-  onUpdate: (partial: { width?: number; height?: number; ditherScale?: number; colorCount?: number }) => void;
+  ditherStrength: number;
+  onUpdate: (partial: { width?: number; height?: number; ditherScale?: number; colorCount?: number; ditherStrength?: number }) => void;
 }
 
-export function OutputControls({ width, height, ditherScale, colorCount, onUpdate }: OutputControlsProps) {
+export function OutputControls({ width, height, ditherScale, colorCount, ditherStrength, onUpdate }: OutputControlsProps) {
   return (
     <div className="control-group">
       <h3>Output</h3>
@@ -59,6 +60,20 @@ export function OutputControls({ width, height, ditherScale, colorCount, onUpdat
             onChange={(e) => onUpdate({ colorCount: Number(e.target.value) })}
           />
           <span className="range-value">{colorCount}</span>
+        </div>
+      </label>
+
+      <label>
+        Transition
+        <div className="range-row">
+          <input
+            type="range"
+            min={0}
+            max={200}
+            value={Math.round(ditherStrength * 100)}
+            onChange={(e) => onUpdate({ ditherStrength: Number(e.target.value) / 100 })}
+          />
+          <span className="range-value">{Math.round(ditherStrength * 100)}%</span>
         </div>
       </label>
     </div>

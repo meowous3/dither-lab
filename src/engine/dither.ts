@@ -1,7 +1,7 @@
 // Unified dithering entry point
 
 import type { DitherParams, DitherResult } from './types';
-import { rasterizeGradient } from './gradient';
+import { rasterizeGradient, generateGradientPalette } from './gradient';
 import { orderedDither } from './ordered-dither';
 import { floydSteinbergDither } from './floyd-steinberg';
 import { atkinsonDither } from './atkinson';
@@ -50,6 +50,24 @@ function upsample(buf: Float32Array, sw: number, sh: number, tw: number, th: num
   return out;
 }
 
+/** Build a uniform RGB cube palette with `levels` steps per channel. */
+function generateUniformPalette(levels: number): Color[] {
+  const palette: Color[] = [];
+  const n = levels - 1;
+  for (let r = 0; r < levels; r++) {
+    for (let g = 0; g < levels; g++) {
+      for (let b = 0; b < levels; b++) {
+        palette.push({
+          r: Math.round(r / n * 255),
+          g: Math.round(g / n * 255),
+          b: Math.round(b / n * 255),
+        });
+      }
+    }
+  }
+  return palette;
+}
+
 function bufferToImageData(buf: Float32Array, width: number, height: number): ImageData {
   const data = new Uint8ClampedArray(width * height * 4);
   for (let i = 0; i < width * height; i++) {
@@ -68,6 +86,7 @@ function applyBlueNoiseDither(
   noiseData: Float32Array,
   ditherScale: number,
   colorCount: number,
+  ditherStrength: number,
   palette?: Color[]
 ): void {
   for (let y = 0; y < height; y++) {
@@ -76,14 +95,16 @@ function applyBlueNoiseDither(
       const threshold = getBlueNoiseThreshold(noiseData, x, y, ditherScale);
 
       if (palette) {
-        const lum = 0.299 * buf[idx] + 0.587 * buf[idx + 1] + 0.114 * buf[idx + 2];
-        const biased = Math.max(0, Math.min(1, lum + (threshold - 0.5) * 0.2));
-        const c = findClosestPaletteColor(biased, biased, biased, palette);
+        const bias = (threshold - 0.5) * 0.2 * ditherStrength;
+        const r = Math.max(0, Math.min(1, buf[idx]     + bias));
+        const g = Math.max(0, Math.min(1, buf[idx + 1] + bias));
+        const b = Math.max(0, Math.min(1, buf[idx + 2] + bias));
+        const c = findClosestPaletteColor(r, g, b, palette);
         buf[idx]     = c.r / 255;
         buf[idx + 1] = c.g / 255;
         buf[idx + 2] = c.b / 255;
       } else {
-        const bias = (threshold - 0.5) / colorCount;
+        const bias = (threshold - 0.5) / colorCount * ditherStrength;
         buf[idx]     = Math.max(0, Math.min(1, quantizeChannel(buf[idx]     + bias, colorCount)));
         buf[idx + 1] = Math.max(0, Math.min(1, quantizeChannel(buf[idx + 1] + bias, colorCount)));
         buf[idx + 2] = Math.max(0, Math.min(1, quantizeChannel(buf[idx + 2] + bias, colorCount)));
@@ -92,48 +113,60 @@ function applyBlueNoiseDither(
   }
 }
 
-export async function ditherGradient(params: DitherParams): Promise<DitherResult> {
-  const { width, height, gradient, algorithm, ditherScale, colorCount, palette } = params;
+export async function dither(params: DitherParams): Promise<DitherResult> {
+  const { width, height, source, algorithm, ditherScale, colorCount, ditherStrength } = params;
+  let { palette } = params;
 
-  // Rasterize the gradient
-  let buf = rasterizeGradient(width, height, gradient);
+  // Get source buffer: either rasterize gradient or copy uploaded image
+  let buf: Float32Array;
+  if (source.type === 'gradient') {
+    buf = rasterizeGradient(width, height, source.gradient);
+    // For gradients: auto-generate palette from the gradient colors
+    // so dithering only uses colors that actually exist on the gradient path.
+    if (!palette) {
+      palette = generateGradientPalette(source.gradient, colorCount);
+    }
+  } else {
+    buf = new Float32Array(source.imageBuffer);
+    // For images: build a uniform RGB cube palette from colorCount levels
+    // so dithering uses findClosestPaletteColor in 3D space.
+    if (!palette) {
+      palette = generateUniformPalette(colorCount);
+    }
+  }
+
+  // All algorithms: downsample to block resolution, dither at scale=1, upsample
+  const ds = downsample(buf, width, height, ditherScale);
 
   switch (algorithm) {
     case 'bayer2x2':
-      orderedDither(buf, width, height, 2, ditherScale, colorCount, palette);
+      orderedDither(ds.buf, ds.w, ds.h, 2, 1, colorCount, ditherStrength, palette);
       break;
     case 'bayer4x4':
-      orderedDither(buf, width, height, 4, ditherScale, colorCount, palette);
+      orderedDither(ds.buf, ds.w, ds.h, 4, 1, colorCount, ditherStrength, palette);
       break;
     case 'bayer8x8':
-      orderedDither(buf, width, height, 8, ditherScale, colorCount, palette);
+      orderedDither(ds.buf, ds.w, ds.h, 8, 1, colorCount, ditherStrength, palette);
       break;
 
-    case 'floyd-steinberg': {
-      const ds = downsample(buf, width, height, ditherScale);
-      floydSteinbergDither(ds.buf, ds.w, ds.h, colorCount, palette);
-      buf = upsample(ds.buf, ds.w, ds.h, width, height);
+    case 'floyd-steinberg':
+      floydSteinbergDither(ds.buf, ds.w, ds.h, colorCount, ditherStrength, palette);
       break;
-    }
-    case 'atkinson': {
-      const ds = downsample(buf, width, height, ditherScale);
-      atkinsonDither(ds.buf, ds.w, ds.h, colorCount, palette);
-      buf = upsample(ds.buf, ds.w, ds.h, width, height);
+    case 'atkinson':
+      atkinsonDither(ds.buf, ds.w, ds.h, colorCount, ditherStrength, palette);
       break;
-    }
-    case 'sierra-lite': {
-      const ds = downsample(buf, width, height, ditherScale);
-      sierraLiteDither(ds.buf, ds.w, ds.h, colorCount, palette);
-      buf = upsample(ds.buf, ds.w, ds.h, width, height);
+    case 'sierra-lite':
+      sierraLiteDither(ds.buf, ds.w, ds.h, colorCount, ditherStrength, palette);
       break;
-    }
 
     case 'blue-noise': {
       const noiseData = await loadBlueNoise();
-      applyBlueNoiseDither(buf, width, height, noiseData, ditherScale, colorCount, palette);
+      applyBlueNoiseDither(ds.buf, ds.w, ds.h, noiseData, 1, colorCount, ditherStrength, palette);
       break;
     }
   }
+
+  buf = upsample(ds.buf, ds.w, ds.h, width, height);
 
   return {
     imageData: bufferToImageData(buf, width, height),

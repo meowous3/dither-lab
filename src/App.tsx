@@ -1,5 +1,6 @@
 import { useDitherEngine } from './hooks/useDitherEngine';
 import { Preview } from './components/Preview';
+import { SourcePicker } from './components/SourcePicker';
 import { GradientControls } from './components/GradientControls';
 import { AlgorithmPicker } from './components/AlgorithmPicker';
 import { OutputControls } from './components/OutputControls';
@@ -8,7 +9,7 @@ import { ColorPaletteEditor } from './components/ColorPaletteEditor';
 import { PresetBar } from './components/PresetBar';
 
 export function App() {
-  const { state, result, rendering, update, updateGradient } = useDitherEngine();
+  const { state, result, rendering, update, updateGradient, uploadImage, clearImage } = useDitherEngine();
 
   return (
     <div className="app">
@@ -17,13 +18,22 @@ export function App() {
       </div>
       <div className="panel-right">
         <h1 className="app-title">webdither</h1>
-        <PresetBar
-          onApply={(partial) => {
-            // Apply all preset fields including gradient
-            update(partial);
-          }}
+        <SourcePicker
+          sourceType={state.sourceType}
+          imageName={state.imageName}
+          onSelectGradient={clearImage}
+          onUploadImage={uploadImage}
         />
-        <GradientControls gradient={state.gradient} onUpdate={updateGradient} />
+        {state.sourceType === 'gradient' && (
+          <PresetBar
+            onApply={(partial) => {
+              update(partial);
+            }}
+          />
+        )}
+        {state.sourceType === 'gradient' && (
+          <GradientControls gradient={state.gradient} onUpdate={updateGradient} />
+        )}
         <AlgorithmPicker
           value={state.algorithm}
           onChange={(algorithm) => update({ algorithm })}
@@ -33,6 +43,7 @@ export function App() {
           height={state.height}
           ditherScale={state.ditherScale}
           colorCount={state.colorCount}
+          ditherStrength={state.ditherStrength}
           onUpdate={update}
         />
         <ColorPaletteEditor

@@ -1,4 +1,4 @@
-import type { GradientConfig, GradientStop } from '../engine/types';
+import type { ColorSpace, GradientConfig, GradientStop } from '../engine/types';
 
 interface GradientControlsProps {
   gradient: GradientConfig;
@@ -51,6 +51,22 @@ export function GradientControls({ gradient, onUpdate }: GradientControlsProps) 
           <option value="linear">Linear</option>
           <option value="radial">Radial</option>
           <option value="conic">Conic</option>
+          <option value="diamond">Diamond</option>
+          <option value="square">Square</option>
+          <option value="spiral">Spiral</option>
+        </select>
+      </label>
+
+      <label>
+        Color Space
+        <select
+          value={gradient.colorSpace || 'rgb'}
+          onChange={(e) => onUpdate({ colorSpace: e.target.value as ColorSpace })}
+        >
+          <option value="rgb">RGB</option>
+          <option value="hsl">HSL</option>
+          <option value="oklab">OKLab</option>
+          <option value="oklch">OKLCH</option>
         </select>
       </label>
 

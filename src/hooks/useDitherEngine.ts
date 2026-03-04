@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ditherGradient } from '../engine/dither';
+import { dither } from '../engine/dither';
 import { useDebounce } from './useDebounce';
-import type { DitherAlgorithm, DitherParams, DitherResult, GradientConfig, Color } from '../engine/types';
+import type { DitherAlgorithm, DitherParams, DitherResult, DitherSource, GradientConfig, Color } from '../engine/types';
 
 export interface DitherState {
   width: number;
@@ -10,7 +10,11 @@ export interface DitherState {
   algorithm: DitherAlgorithm;
   ditherScale: number;
   colorCount: number;
+  ditherStrength: number;
   palette: Color[] | undefined;
+  sourceType: 'gradient' | 'image';
+  imageBuffer: Float32Array | null;
+  imageName: string | null;
 }
 
 const DEFAULT_STATE: DitherState = {
@@ -23,11 +27,16 @@ const DEFAULT_STATE: DitherState = {
       { position: 0, color: { r: 0, g: 0, b: 0 } },
       { position: 1, color: { r: 255, g: 255, b: 255 } },
     ],
+    colorSpace: 'oklab',
   },
   algorithm: 'bayer8x8',
   ditherScale: 1,
   colorCount: 2,
+  ditherStrength: 1,
   palette: undefined,
+  sourceType: 'gradient',
+  imageBuffer: null,
+  imageName: null,
 };
 
 export function useDitherEngine() {
@@ -39,20 +48,30 @@ export function useDitherEngine() {
   const debouncedState = useDebounce(state, 50);
 
   useEffect(() => {
+    const { sourceType, imageBuffer, gradient, width, height, algorithm, ditherScale, colorCount, ditherStrength, palette } = debouncedState;
+
+    // Skip if image mode but no image loaded yet
+    if (sourceType === 'image' && !imageBuffer) return;
+
     const id = ++abortRef.current;
     setRendering(true);
 
+    const source: DitherSource = sourceType === 'image' && imageBuffer
+      ? { type: 'image', imageBuffer }
+      : { type: 'gradient', gradient };
+
     const params: DitherParams = {
-      width: debouncedState.width,
-      height: debouncedState.height,
-      gradient: debouncedState.gradient,
-      algorithm: debouncedState.algorithm,
-      ditherScale: debouncedState.ditherScale,
-      colorCount: debouncedState.colorCount,
-      palette: debouncedState.palette,
+      width,
+      height,
+      source,
+      algorithm,
+      ditherScale,
+      colorCount,
+      ditherStrength,
+      palette,
     };
 
-    ditherGradient(params).then((res) => {
+    dither(params).then((res) => {
       if (abortRef.current === id) {
         setResult(res);
         setRendering(false);
@@ -71,5 +90,48 @@ export function useDitherEngine() {
     }));
   }, []);
 
-  return { state, result, rendering, update, updateGradient };
+  const uploadImage = useCallback((file: File) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0);
+      const imgData = ctx.getImageData(0, 0, img.width, img.height);
+      const pixels = imgData.data;
+
+      // Convert RGBA uint8 to RGB float32 (0-1)
+      const buf = new Float32Array(img.width * img.height * 3);
+      for (let i = 0; i < img.width * img.height; i++) {
+        buf[i * 3]     = pixels[i * 4]     / 255;
+        buf[i * 3 + 1] = pixels[i * 4 + 1] / 255;
+        buf[i * 3 + 2] = pixels[i * 4 + 2] / 255;
+      }
+
+      setState((prev) => ({
+        ...prev,
+        sourceType: 'image',
+        imageBuffer: buf,
+        imageName: file.name,
+        width: img.width,
+        height: img.height,
+      }));
+
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
+  }, []);
+
+  const clearImage = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      sourceType: 'gradient',
+      imageBuffer: null,
+      imageName: null,
+    }));
+  }, []);
+
+  return { state, result, rendering, update, updateGradient, uploadImage, clearImage };
 }

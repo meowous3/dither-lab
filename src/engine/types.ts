@@ -18,19 +18,27 @@ export interface GradientStop {
   color: Color;
 }
 
+export type ColorSpace = 'rgb' | 'hsl' | 'oklab' | 'oklch';
+
 export interface GradientConfig {
-  type: 'linear' | 'radial' | 'conic';
-  angle: number; // degrees (for linear/conic)
+  type: 'linear' | 'radial' | 'conic' | 'diamond' | 'square' | 'spiral';
+  angle: number; // degrees (for linear/conic/spiral)
   stops: GradientStop[];
+  colorSpace: ColorSpace;
 }
+
+export type DitherSource =
+  | { type: 'gradient'; gradient: GradientConfig }
+  | { type: 'image'; imageBuffer: Float32Array };
 
 export interface DitherParams {
   width: number;
   height: number;
-  gradient: GradientConfig;
+  source: DitherSource;
   algorithm: DitherAlgorithm;
   ditherScale: number;   // pixel block size 1-16
   colorCount: number;    // quantization levels per channel
+  ditherStrength: number; // transition width multiplier (0 = hard bands, 1 = normal)
   palette?: Color[];     // optional fixed palette
 }
 

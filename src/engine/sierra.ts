@@ -1,5 +1,5 @@
 // Sierra Lite error diffusion dithering
-// Fast 3-neighbor kernel with good quality
+// Fast 3-neighbor kernel with good quality — with serpentine scanning
 //
 //   * 2/4
 // 1/4 1/4
@@ -12,10 +12,13 @@ export function sierraLiteDither(
   width: number,
   height: number,
   colorCount: number,
+  ditherStrength: number = 1,
   palette?: Color[]
 ): void {
   for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
+    const leftToRight = y % 2 === 0;
+    for (let i = 0; i < width; i++) {
+      const x = leftToRight ? i : width - 1 - i;
       const idx = (y * width + x) * 3;
       const oldR = buf[idx];
       const oldG = buf[idx + 1];
@@ -35,13 +38,15 @@ export function sierraLiteDither(
       buf[idx + 1] = newG;
       buf[idx + 2] = newB;
 
-      const errR = oldR - newR;
-      const errG = oldG - newG;
-      const errB = oldB - newB;
+      const errR = (oldR - newR) * ditherStrength;
+      const errG = (oldG - newG) * ditherStrength;
+      const errB = (oldB - newB) * ditherStrength;
 
-      distribute(buf, width, height, x + 1, y,     errR, errG, errB, 2 / 4);
-      distribute(buf, width, height, x - 1, y + 1, errR, errG, errB, 1 / 4);
-      distribute(buf, width, height, x,     y + 1, errR, errG, errB, 1 / 4);
+      // Flip horizontal offsets for right-to-left rows
+      const dir = leftToRight ? 1 : -1;
+      distribute(buf, width, height, x + dir, y,     errR, errG, errB, 2 / 4);
+      distribute(buf, width, height, x - dir, y + 1, errR, errG, errB, 1 / 4);
+      distribute(buf, width, height, x,       y + 1, errR, errG, errB, 1 / 4);
     }
   }
 }

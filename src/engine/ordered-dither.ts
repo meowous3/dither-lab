@@ -17,6 +17,7 @@ export function orderedDither(
   matrixSize: 2 | 4 | 8,
   ditherScale: number,
   colorCount: number,
+  ditherStrength: number = 1,
   palette?: Color[]
 ): void {
   const matrix = getBayerMatrix(matrixSize);
@@ -34,16 +35,18 @@ export function orderedDither(
       let b = buf[idx + 2];
 
       if (palette) {
-        // Add threshold bias then snap to palette
-        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-        const biased = Math.max(0, Math.min(1, lum + (threshold - 0.5) * 0.2));
-        const c = findClosestPaletteColor(biased, biased, biased, palette);
+        // Add threshold bias per channel then snap to closest palette color
+        const bias = (threshold - 0.5) / colorCount * ditherStrength;
+        const br = Math.max(0, Math.min(1, r + bias));
+        const bg = Math.max(0, Math.min(1, g + bias));
+        const bb = Math.max(0, Math.min(1, b + bias));
+        const c = findClosestPaletteColor(br, bg, bb, palette);
         buf[idx]     = c.r / 255;
         buf[idx + 1] = c.g / 255;
         buf[idx + 2] = c.b / 255;
       } else {
         // Standard ordered dither: add threshold before quantizing
-        const bias = (threshold - 0.5) / colorCount;
+        const bias = (threshold - 0.5) / colorCount * ditherStrength;
         r = Math.max(0, Math.min(1, quantizeChannel(r + bias, colorCount)));
         g = Math.max(0, Math.min(1, quantizeChannel(g + bias, colorCount)));
         b = Math.max(0, Math.min(1, quantizeChannel(b + bias, colorCount)));
