@@ -1,8 +1,8 @@
 // Unified error diffusion dithering engine
 // All algorithms use serpentine scanning (alternating row direction)
 
-import { quantizeChannel, findClosestPaletteColor, findTwoClosestPaletteColors, pixelHash } from './quantize';
-import type { Color, DitherTechnique } from './types';
+import { quantizeChannel, findClosestPaletteColor, findTwoClosestPaletteColors, pixelHash, getDistanceFn } from './quantize';
+import type { Color, DitherTechnique, ColorDistanceMetric } from './types';
 
 interface KernelEntry {
   dx: number;
@@ -124,10 +124,30 @@ export function errorDiffusionDither(
   palette?: Color[],
   technique: DitherTechnique = 'continuous',
   edgeMap?: Float32Array,
-  directionAngle: number = 0
+  directionAngle: number = 0,
+  colorDistanceMetric: ColorDistanceMetric = 'euclidean-rgb',
+  pixelAspectRatio: number = 1
 ): void {
-  const kernel = KERNELS[algorithmName];
-  if (!kernel) throw new Error(`Unknown error diffusion algorithm: ${algorithmName}`);
+  const distFn = getDistanceFn(colorDistanceMetric);
+  const par = pixelAspectRatio || 1;
+  const baseKernel = KERNELS[algorithmName];
+  if (!baseKernel) throw new Error(`Unknown error diffusion algorithm: ${algorithmName}`);
+
+  // Adjust kernel weights for non-square pixels: reweight by inverse physical distance
+  let kernel = baseKernel;
+  if (par !== 1) {
+    const adjusted = baseKernel.map((e) => {
+      const physDist = Math.sqrt((e.dx * par) ** 2 + e.dy ** 2);
+      const origDist = Math.sqrt(e.dx ** 2 + e.dy ** 2);
+      const scale = origDist > 0 ? origDist / physDist : 1;
+      return { ...e, weight: e.weight * scale };
+    });
+    // Renormalize to preserve total weight
+    const origTotal = baseKernel.reduce((s, e) => s + e.weight, 0);
+    const adjTotal = adjusted.reduce((s, e) => s + e.weight, 0);
+    const norm = adjTotal > 0 ? origTotal / adjTotal : 1;
+    kernel = adjusted.map((e) => ({ ...e, weight: e.weight * norm }));
+  }
 
   // Compute stable error propagation limit: strength * totalWeight must not exceed 1.0
   const totalKernelWeight = kernel.reduce((s, e) => s + e.weight, 0);
@@ -179,7 +199,7 @@ export function errorDiffusionDither(
         // This prevents error from jumping to distant wrong palette colors.
         if (palette) {
           const [a, bCol] = findTwoClosestPaletteColors(
-            origBuf[idx], origBuf[idx + 1], origBuf[idx + 2], palette
+            origBuf[idx], origBuf[idx + 1], origBuf[idx + 2], palette, distFn
           );
           // Use error-adjusted pixel to decide between the two candidates
           const da = (oldR - a.r / 255) ** 2 + (oldG - a.g / 255) ** 2 + (oldB - a.b / 255) ** 2;
@@ -197,7 +217,7 @@ export function errorDiffusionDither(
           }
         }
       } else if (palette) {
-        const c = findClosestPaletteColor(oldR, oldG, oldB, palette);
+        const c = findClosestPaletteColor(oldR, oldG, oldB, palette, distFn);
         newR = c.r / 255; newG = c.g / 255; newB = c.b / 255;
       } else {
         newR = quantizeChannel(oldR, colorCount);

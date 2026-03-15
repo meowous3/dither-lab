@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { dither } from '../engine/dither';
 import { useDebounce } from './useDebounce';
 import { loadImageFile } from '../lib/image-loader';
-import type { DitherAlgorithm, DitherTechnique, DitherParams, DitherResult, DitherSource, GradientConfig, Color, ImagePaletteMode } from '../engine/types';
+import type { DitherAlgorithm, DitherTechnique, DitherParams, DitherResult, DitherSource, GradientConfig, Color, ImagePaletteMode, ColorDistanceMetric } from '../engine/types';
 
 export interface DitherState {
   width: number;
@@ -10,6 +10,7 @@ export interface DitherState {
   gradient: GradientConfig;
   algorithm: DitherAlgorithm;
   ditherScale: number;
+  patternScale: number;
   colorCount: number;
   ditherStrength: number;
   gammaCorrection: boolean;
@@ -18,6 +19,8 @@ export interface DitherState {
   ditherTechnique: DitherTechnique;
   directionAngle: number;
   alphaThreshold: number;
+  colorDistanceMetric: ColorDistanceMetric;
+  pixelAspectRatio: number;
   sourceType: 'gradient' | 'image';
   imageBuffer: Float32Array | null;
   alphaBuffer: Float32Array | null;
@@ -38,6 +41,7 @@ const DEFAULT_STATE: DitherState = {
   },
   algorithm: 'bayer8x8',
   ditherScale: 1,
+  patternScale: 1,
   colorCount: 2,
   ditherStrength: 1,
   gammaCorrection: false,
@@ -46,11 +50,15 @@ const DEFAULT_STATE: DitherState = {
   ditherTechnique: 'intermediate',
   directionAngle: 0,
   alphaThreshold: 128,
+  colorDistanceMetric: 'euclidean-rgb',
+  pixelAspectRatio: 1,
   sourceType: 'gradient',
   imageBuffer: null,
   alphaBuffer: null,
   imageName: null,
 };
+
+const MAX_HISTORY = 50;
 
 export function useDitherEngine() {
   const [state, setState] = useState<DitherState>(DEFAULT_STATE);
@@ -58,10 +66,15 @@ export function useDitherEngine() {
   const [rendering, setRendering] = useState(false);
   const abortRef = useRef(0);
 
+  // Undo/redo history
+  const historyRef = useRef<DitherState[]>([]);
+  const futureRef = useRef<DitherState[]>([]);
+  const skipHistoryRef = useRef(false);
+
   const debouncedState = useDebounce(state, 50);
 
   useEffect(() => {
-    const { sourceType, imageBuffer, alphaBuffer, gradient, width, height, algorithm, ditherScale, colorCount, ditherStrength, gammaCorrection, imagePaletteMode, palette, ditherTechnique, directionAngle, alphaThreshold } = debouncedState;
+    const { sourceType, imageBuffer, alphaBuffer, gradient, width, height, algorithm, ditherScale, patternScale, colorCount, ditherStrength, gammaCorrection, imagePaletteMode, palette, ditherTechnique, directionAngle, alphaThreshold, colorDistanceMetric, pixelAspectRatio } = debouncedState;
 
     // Skip if image mode but no image loaded yet
     if (sourceType === 'image' && !imageBuffer) return;
@@ -79,6 +92,7 @@ export function useDitherEngine() {
       source,
       algorithm,
       ditherScale,
+      patternScale,
       colorCount,
       ditherStrength,
       gammaCorrection,
@@ -87,6 +101,8 @@ export function useDitherEngine() {
       ditherTechnique,
       directionAngle,
       alphaThreshold,
+      colorDistanceMetric,
+      pixelAspectRatio,
     };
 
     dither(params).then((res) => {
@@ -99,6 +115,13 @@ export function useDitherEngine() {
 
   const update = useCallback((partial: Partial<DitherState>) => {
     setState((prev) => {
+      // Push to undo history
+      if (!skipHistoryRef.current) {
+        historyRef.current = [...historyRef.current.slice(-(MAX_HISTORY - 1)), prev];
+        futureRef.current = [];
+      }
+      skipHistoryRef.current = false;
+
       const next = { ...prev, ...partial };
       // When colorCount changes without an explicit palette in the update,
       // clear any preset palette so auto-generation uses the new count
@@ -109,11 +132,36 @@ export function useDitherEngine() {
     });
   }, []);
 
+  const undo = useCallback(() => {
+    const prev = historyRef.current.pop();
+    if (!prev) return;
+    setState((current) => {
+      futureRef.current.push(current);
+      return prev;
+    });
+  }, []);
+
+  const redo = useCallback(() => {
+    const next = futureRef.current.pop();
+    if (!next) return;
+    setState((current) => {
+      historyRef.current.push(current);
+      return next;
+    });
+  }, []);
+
+  const canUndo = historyRef.current.length > 0;
+  const canRedo = futureRef.current.length > 0;
+
   const updateGradient = useCallback((partial: Partial<GradientConfig>) => {
-    setState((prev) => ({
-      ...prev,
-      gradient: { ...prev.gradient, ...partial },
-    }));
+    setState((prev) => {
+      historyRef.current = [...historyRef.current.slice(-(MAX_HISTORY - 1)), prev];
+      futureRef.current = [];
+      return {
+        ...prev,
+        gradient: { ...prev.gradient, ...partial },
+      };
+    });
   }, []);
 
   const uploadImage = useCallback((file: File) => {
@@ -152,5 +200,5 @@ export function useDitherEngine() {
     }));
   }, []);
 
-  return { state, result, rendering, update, updateGradient, uploadImage, loadBuffer, clearImage };
+  return { state, result, rendering, update, updateGradient, uploadImage, loadBuffer, clearImage, undo, redo, canUndo, canRedo };
 }

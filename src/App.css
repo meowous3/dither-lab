@@ -570,6 +570,20 @@ input[type="color"] {
   font-variant-numeric: tabular-nums;
 }
 
+/* Before/after comparison hint */
+.compare-hint {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--fg2);
+  font-size: 11px;
+  background: rgba(0,0,0,0.5);
+  padding: 3px 10px;
+  border-radius: 4px;
+  pointer-events: none;
+}
+
 /* Palette from image */
 .palette-source-preview {
   display: flex;

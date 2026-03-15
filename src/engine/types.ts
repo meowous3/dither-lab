@@ -3,6 +3,9 @@ export type DitherAlgorithm =
   | 'bayer2x2'
   | 'bayer4x4'
   | 'bayer8x8'
+  | 'halftone'
+  | 'crosshatch'
+  | 'horizontal-line'
   | 'floyd-steinberg'
   | 'jarvis-judice-ninke'
   | 'stucki'
@@ -12,6 +15,8 @@ export type DitherAlgorithm =
   | 'sierra-two-row'
   | 'sierra-lite'
   | 'blue-noise';
+
+export type ColorDistanceMetric = 'euclidean-rgb' | 'redmean' | 'cie76';
 
 export type DitherTechnique =
   | 'reduce-only'
@@ -67,7 +72,8 @@ export interface DitherParams {
   height: number;
   source: DitherSource;
   algorithm: DitherAlgorithm;
-  ditherScale: number;   // pixel block size 1-16
+  ditherScale: number;   // pixel block size 1-16 (downsamples resolution)
+  patternScale: number;  // pattern tile size 1-16 (scales pattern without reducing resolution)
   colorCount: number;    // quantization levels per channel
   ditherStrength: number; // transition width multiplier (0 = hard bands, 1 = normal)
   gammaCorrection: boolean; // linearize before dithering for perceptual accuracy
@@ -76,10 +82,13 @@ export interface DitherParams {
   ditherTechnique: DitherTechnique; // how the algorithm applies dithering
   directionAngle: number; // 0-360, for directional technique
   alphaThreshold: number; // 0-255, pixels below this alpha become transparent
+  colorDistanceMetric: ColorDistanceMetric;
+  pixelAspectRatio: number; // pixel width/height, <1 = tall pixels (e.g. CGA), >1 = wide
 }
 
 export interface DitherResult {
   imageData: ImageData;
+  sourceImageData?: ImageData; // original (pre-dither) for before/after
   width: number;
   height: number;
 }

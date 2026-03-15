@@ -12,6 +12,7 @@ function buildParams(image: BulkImage, settings: DitherSettings): DitherParams {
     source: { type: 'image', imageBuffer: image.buffer, alphaBuffer: image.alphaBuffer },
     algorithm: effective.algorithm,
     ditherScale: effective.ditherScale,
+    patternScale: effective.patternScale,
     colorCount: effective.colorCount,
     ditherStrength: effective.ditherStrength,
     gammaCorrection: effective.gammaCorrection,
@@ -20,6 +21,8 @@ function buildParams(image: BulkImage, settings: DitherSettings): DitherParams {
     ditherTechnique: effective.ditherTechnique,
     directionAngle: effective.directionAngle,
     alphaThreshold: effective.alphaThreshold,
+    colorDistanceMetric: effective.colorDistanceMetric,
+    pixelAspectRatio: effective.pixelAspectRatio,
   };
 }
 

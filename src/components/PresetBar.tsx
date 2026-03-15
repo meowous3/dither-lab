@@ -1,5 +1,5 @@
 import type { DitherState } from '../hooks/useDitherEngine';
-import type { DitherAlgorithm, DitherTechnique, ColorSpace, GradientConfig, ImagePaletteMode } from '../engine/types';
+import type { DitherAlgorithm, DitherTechnique, ColorSpace, GradientConfig, ImagePaletteMode, ColorDistanceMetric } from '../engine/types';
 
 interface PresetBarProps {
   sourceType: 'gradient' | 'image';
@@ -11,8 +11,8 @@ interface PresetBarProps {
 // Top-level lock keys that map directly to DitherState fields
 const TOP_LEVEL_LOCKS: (keyof DitherState)[] = [
   'algorithm', 'ditherTechnique', 'directionAngle',
-  'colorCount', 'ditherScale', 'ditherStrength',
-  'palette', 'imagePaletteMode',
+  'colorCount', 'ditherScale', 'patternScale', 'ditherStrength',
+  'palette', 'imagePaletteMode', 'colorDistanceMetric', 'pixelAspectRatio',
 ];
 
 // Gradient sub-field lock keys
@@ -175,9 +175,11 @@ const IMAGE_PRESETS: Preset[] = [
 
 const ALGORITHMS: DitherAlgorithm[] = [
   'bayer2x2', 'bayer4x4', 'bayer8x8',
+  'halftone', 'crosshatch', 'horizontal-line',
   'floyd-steinberg', 'jarvis-judice-ninke', 'stucki', 'atkinson', 'burkes',
   'sierra', 'sierra-two-row', 'sierra-lite', 'blue-noise',
 ];
+const COLOR_DISTANCE_METRICS: ColorDistanceMetric[] = ['euclidean-rgb', 'redmean', 'cie76'];
 const GRADIENT_TYPES = ['linear', 'radial', 'conic', 'diamond', 'square', 'spiral'] as const;
 const COLOR_SPACES: ColorSpace[] = ['rgb', 'hsl', 'oklab', 'oklch'];
 const IMAGE_PALETTE_MODES: ImagePaletteMode[] = [
@@ -205,13 +207,16 @@ function randomGradientPreset(): Partial<DitherState> {
   }));
 
   const technique = TECHNIQUES[Math.floor(Math.random() * TECHNIQUES.length)];
+  const algorithm = ALGORITHMS[Math.floor(Math.random() * ALGORITHMS.length)];
   return {
     colorCount: 2 + Math.floor(Math.random() * 7), // 2-8
-    algorithm: ALGORITHMS[Math.floor(Math.random() * ALGORITHMS.length)],
+    algorithm,
     ditherScale: 1 + Math.floor(Math.random() * 4), // 1-4
+    patternScale: 1 + Math.floor(Math.random() * 4), // 1-4
     ditherStrength: 0.5 + Math.random(), // 0.5-1.5
     ditherTechnique: technique,
     directionAngle: Math.floor(Math.random() * 360),
+    colorDistanceMetric: COLOR_DISTANCE_METRICS[Math.floor(Math.random() * COLOR_DISTANCE_METRICS.length)],
     palette: undefined,
     gradient: {
       type: GRADIENT_TYPES[Math.floor(Math.random() * GRADIENT_TYPES.length)],
@@ -224,13 +229,16 @@ function randomGradientPreset(): Partial<DitherState> {
 
 function randomImagePreset(): Partial<DitherState> {
   const technique = TECHNIQUES[Math.floor(Math.random() * TECHNIQUES.length)];
+  const algorithm = ALGORITHMS[Math.floor(Math.random() * ALGORITHMS.length)];
   return {
     colorCount: 2 + Math.floor(Math.random() * 15), // 2-16
-    algorithm: ALGORITHMS[Math.floor(Math.random() * ALGORITHMS.length)],
+    algorithm,
     ditherScale: 1 + Math.floor(Math.random() * 4), // 1-4
+    patternScale: 1 + Math.floor(Math.random() * 4), // 1-4
     ditherStrength: 0.5 + Math.random(), // 0.5-1.5
     ditherTechnique: technique,
     directionAngle: Math.floor(Math.random() * 360),
+    colorDistanceMetric: COLOR_DISTANCE_METRICS[Math.floor(Math.random() * COLOR_DISTANCE_METRICS.length)],
     imagePaletteMode: IMAGE_PALETTE_MODES[Math.floor(Math.random() * IMAGE_PALETTE_MODES.length)],
     palette: undefined,
   };

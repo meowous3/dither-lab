@@ -6,8 +6,9 @@ import { orderedDither } from './ordered-dither';
 import { errorDiffusionDither, ERROR_DIFFUSION_ALGORITHMS } from './error-diffusion';
 import { loadBlueNoise, getBlueNoiseThreshold } from './blue-noise';
 import { medianCutPalette, kmeansPalette, octreePalette, popularityPalette } from './palette-extraction';
-import { quantizeChannel, findClosestPaletteColor, findTwoClosestPaletteColors, pixelHash } from './quantize';
+import { quantizeChannel, findClosestPaletteColor, findTwoClosestPaletteColors, pixelHash, getDistanceFn } from './quantize';
 import { computeEdgeMap } from './edge-detect';
+import { getPatternMatrix } from './patterns';
 import type { Color } from './types';
 
 /**
@@ -267,13 +268,14 @@ function quantizeOnly(
   width: number,
   height: number,
   colorCount: number,
-  palette?: Color[]
+  palette?: Color[],
+  distFn = getDistanceFn('euclidean-rgb')
 ): void {
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const idx = (y * width + x) * 3;
       if (palette) {
-        const c = findClosestPaletteColor(buf[idx], buf[idx + 1], buf[idx + 2], palette);
+        const c = findClosestPaletteColor(buf[idx], buf[idx + 1], buf[idx + 2], palette, distFn);
         buf[idx]     = c.r / 255;
         buf[idx + 1] = c.g / 255;
         buf[idx + 2] = c.b / 255;
@@ -298,12 +300,15 @@ function applyBlueNoiseDither(
   ditherStrength: number,
   palette?: Color[],
   technique: DitherTechnique = 'continuous',
-  edgeMap?: Float32Array
+  edgeMap?: Float32Array,
+  distFn = getDistanceFn('euclidean-rgb'),
+  pixelAspectRatio: number = 1
 ): void {
+  const par = pixelAspectRatio || 1;
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const idx = (y * width + x) * 3;
-      let threshold = getBlueNoiseThreshold(noiseData, x, y, ditherScale);
+      let threshold = getBlueNoiseThreshold(noiseData, Math.floor(x * par), y, ditherScale);
 
       const r = buf[idx];
       const g = buf[idx + 1];
@@ -321,7 +326,7 @@ function applyBlueNoiseDither(
 
       if (technique === 'intermediate') {
         if (palette) {
-          const [a, bCol, blend] = findTwoClosestPaletteColors(r, g, b, palette);
+          const [a, bCol, blend] = findTwoClosestPaletteColors(r, g, b, palette, distFn);
           const pick = blend > threshold * localStrength ? bCol : a;
           buf[idx]     = pick.r / 255;
           buf[idx + 1] = pick.g / 255;
@@ -342,7 +347,7 @@ function applyBlueNoiseDither(
           const br = Math.max(0, Math.min(1, r + bias));
           const bg = Math.max(0, Math.min(1, g + bias));
           const bb = Math.max(0, Math.min(1, b + bias));
-          const c = findClosestPaletteColor(br, bg, bb, palette);
+          const c = findClosestPaletteColor(br, bg, bb, palette, distFn);
           buf[idx]     = c.r / 255;
           buf[idx + 1] = c.g / 255;
           buf[idx + 2] = c.b / 255;
@@ -414,10 +419,11 @@ function bufferToImageData(buf: Float32Array, width: number, height: number, alp
 }
 
 export async function dither(params: DitherParams): Promise<DitherResult> {
-  const { width, height, source, algorithm, ditherScale, colorCount, ditherStrength, gammaCorrection, imagePaletteMode, ditherTechnique, directionAngle, alphaThreshold } = params;
+  const { width, height, source, algorithm, ditherScale, patternScale, colorCount, ditherStrength, gammaCorrection, imagePaletteMode, ditherTechnique, directionAngle, alphaThreshold, colorDistanceMetric, pixelAspectRatio } = params;
   let { palette } = params;
 
   const technique = ditherTechnique || 'continuous';
+  const distFn = getDistanceFn(colorDistanceMetric);
 
   // Get source buffer and alpha
   let buf: Float32Array;
@@ -434,6 +440,9 @@ export async function dither(params: DitherParams): Promise<DitherResult> {
       palette = generateImagePalette(source.imageBuffer, width, height, colorCount, imagePaletteMode);
     }
   }
+
+  // Save source for before/after comparison
+  const sourceImageData = bufferToImageData(buf, width, height);
 
   // Downsample to block resolution
   const ds = downsample(buf, width, height, ditherScale);
@@ -453,8 +462,7 @@ export async function dither(params: DitherParams): Promise<DitherResult> {
 
   // Technique: none / reduce-only → skip algorithm, just quantize
   if (technique === 'reduce-only') {
-    // Quantize to palette without any dithering
-    quantizeOnly(ds.buf, ds.w, ds.h, colorCount, ditherPalette);
+    quantizeOnly(ds.buf, ds.w, ds.h, colorCount, ditherPalette, distFn);
   } else {
     // Compute edge map for edge-aware technique
     let edgeMap: Float32Array | undefined;
@@ -465,29 +473,37 @@ export async function dither(params: DitherParams): Promise<DitherResult> {
     // Apply dithering algorithm
     switch (algorithm) {
       case 'none':
-        quantizeOnly(ds.buf, ds.w, ds.h, colorCount, ditherPalette);
+        quantizeOnly(ds.buf, ds.w, ds.h, colorCount, ditherPalette, distFn);
         break;
 
       case 'bayer2x2':
-        orderedDither(ds.buf, ds.w, ds.h, 2, 1, colorCount, ditherStrength, ditherPalette, technique, edgeMap);
+        orderedDither(ds.buf, ds.w, ds.h, 2, patternScale, colorCount, ditherStrength, ditherPalette, technique, edgeMap, undefined, colorDistanceMetric, pixelAspectRatio);
         break;
       case 'bayer4x4':
-        orderedDither(ds.buf, ds.w, ds.h, 4, 1, colorCount, ditherStrength, ditherPalette, technique, edgeMap);
+        orderedDither(ds.buf, ds.w, ds.h, 4, patternScale, colorCount, ditherStrength, ditherPalette, technique, edgeMap, undefined, colorDistanceMetric, pixelAspectRatio);
         break;
       case 'bayer8x8':
-        orderedDither(ds.buf, ds.w, ds.h, 8, 1, colorCount, ditherStrength, ditherPalette, technique, edgeMap);
+        orderedDither(ds.buf, ds.w, ds.h, 8, patternScale, colorCount, ditherStrength, ditherPalette, technique, edgeMap, undefined, colorDistanceMetric, pixelAspectRatio);
         break;
+
+      case 'halftone':
+      case 'crosshatch':
+      case 'horizontal-line': {
+        const patternMatrix = getPatternMatrix(algorithm);
+        orderedDither(ds.buf, ds.w, ds.h, 8, patternScale, colorCount, ditherStrength, ditherPalette, technique, edgeMap, patternMatrix, colorDistanceMetric, pixelAspectRatio);
+        break;
+      }
 
       case 'blue-noise': {
         const noiseData = await loadBlueNoise();
-        applyBlueNoiseDither(ds.buf, ds.w, ds.h, noiseData, 1, colorCount, ditherStrength, ditherPalette, technique, edgeMap);
+        applyBlueNoiseDither(ds.buf, ds.w, ds.h, noiseData, patternScale, colorCount, ditherStrength, ditherPalette, technique, edgeMap, distFn, pixelAspectRatio);
         break;
       }
 
       default:
         // All error diffusion algorithms handled by unified engine
         if (ERROR_DIFFUSION_ALGORITHMS.includes(algorithm)) {
-          errorDiffusionDither(algorithm, ds.buf, ds.w, ds.h, colorCount, ditherStrength, ditherPalette, technique, edgeMap, directionAngle);
+          errorDiffusionDither(algorithm, ds.buf, ds.w, ds.h, colorCount, ditherStrength, ditherPalette, technique, edgeMap, directionAngle, colorDistanceMetric, pixelAspectRatio);
         }
         break;
     }
@@ -509,6 +525,7 @@ export async function dither(params: DitherParams): Promise<DitherResult> {
 
   return {
     imageData: bufferToImageData(buf, width, height, finalAlpha),
+    sourceImageData,
     width,
     height,
   };

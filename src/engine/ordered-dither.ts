@@ -2,9 +2,9 @@
 // Ported from Canvas2DPostProcess.tsx:104-118
 
 import { getBayerMatrix } from './bayer';
-import { quantizeChannel } from './quantize';
+import { quantizeChannel, getDistanceFn } from './quantize';
 import { findClosestPaletteColor, findTwoClosestPaletteColors, pixelHash } from './quantize';
-import type { Color, DitherTechnique } from './types';
+import type { Color, DitherTechnique, ColorDistanceMetric } from './types';
 
 /**
  * Apply ordered (Bayer) dithering to a gradient buffer in-place.
@@ -20,15 +20,24 @@ export function orderedDither(
   ditherStrength: number = 1,
   palette?: Color[],
   technique: DitherTechnique = 'continuous',
-  edgeMap?: Float32Array
+  edgeMap?: Float32Array,
+  customMatrix?: number[][],
+  colorDistanceMetric: ColorDistanceMetric = 'euclidean-rgb',
+  pixelAspectRatio: number = 1
 ): void {
-  const matrix = getBayerMatrix(matrixSize);
+  const matrix = customMatrix ?? getBayerMatrix(matrixSize);
+  const distFn = getDistanceFn(colorDistanceMetric);
   const size = matrix.length;
+  // Compensate pattern for non-square pixels: scale x lookup by PAR so
+  // the pattern appears uniform on the target display.
+  // PAR < 1 (tall pixels) → slower x advance → wider pattern in pixel space
+  // PAR > 1 (wide pixels) → faster x advance → narrower pattern in pixel space
+  const par = pixelAspectRatio || 1;
 
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const idx = (y * width + x) * 3;
-      const mx = Math.floor(x / ditherScale) % size;
+      const mx = (Math.floor(x * par / ditherScale) % size + size) % size;
       const my = Math.floor(y / ditherScale) % size;
       let threshold = matrix[my][mx];
 
@@ -51,7 +60,7 @@ export function orderedDither(
       if (technique === 'intermediate') {
         // Intermediate: find 2 closest palette colors, threshold picks between them
         if (palette) {
-          const [a, bCol, blend] = findTwoClosestPaletteColors(r, g, b, palette);
+          const [a, bCol, blend] = findTwoClosestPaletteColors(r, g, b, palette, distFn);
           const pick = blend > threshold * localStrength ? bCol : a;
           buf[idx]     = pick.r / 255;
           buf[idx + 1] = pick.g / 255;
@@ -76,7 +85,7 @@ export function orderedDither(
           const br = Math.max(0, Math.min(1, r + bias));
           const bg = Math.max(0, Math.min(1, g + bias));
           const bb = Math.max(0, Math.min(1, b + bias));
-          const c = findClosestPaletteColor(br, bg, bb, palette);
+          const c = findClosestPaletteColor(br, bg, bb, palette, distFn);
           buf[idx]     = c.r / 255;
           buf[idx + 1] = c.g / 255;
           buf[idx + 2] = c.b / 255;

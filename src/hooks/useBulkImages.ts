@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { loadImageFile } from '../lib/image-loader';
+import { isGifFile, loadGifFrames } from '../lib/gif-loader';
 import type { BulkImage, DitherSettings } from '../engine/bulk-types';
 import type { DitherResult } from '../engine/types';
 
@@ -16,12 +17,22 @@ export function useBulkImages() {
     const imageFiles = files.filter((f) => f.type.startsWith('image/'));
     if (imageFiles.length === 0) return [];
 
-    const loaded = await Promise.all(
-      imageFiles.map((f) => loadImageFile(f).catch(() => null))
-    );
+    // Separate GIFs from regular images
+    const gifFiles = imageFiles.filter(isGifFile);
+    const regularFiles = imageFiles.filter((f) => !isGifFile(f));
+
+    const [regularLoaded, ...gifFrameArrays] = await Promise.all([
+      Promise.all(regularFiles.map((f) => loadImageFile(f).catch(() => null))),
+      ...gifFiles.map((f) => loadGifFrames(f).catch(() => [] as ReturnType<typeof loadImageFile extends Promise<infer T> ? T : never>[])),
+    ]);
+
+    const allLoaded = [
+      ...regularLoaded.filter(Boolean),
+      ...gifFrameArrays.flat(),
+    ];
 
     const newImages: BulkImage[] = [];
-    for (const img of loaded) {
+    for (const img of allLoaded) {
       if (!img) continue;
       newImages.push({
         id: `bulk-${++idCounterRef.current}`,
