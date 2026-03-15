@@ -365,25 +365,63 @@ function intermediateChannel(v: number, n: number, threshold: number, strength: 
   return blend > threshold * strength ? hi : lo;
 }
 
-function bufferToImageData(buf: Float32Array, width: number, height: number): ImageData {
+function downsampleAlpha(buf: Float32Array, w: number, h: number, scale: number): Float32Array {
+  if (scale <= 1) return buf;
+  const nw = Math.max(1, Math.ceil(w / scale));
+  const nh = Math.max(1, Math.ceil(h / scale));
+  const out = new Float32Array(nw * nh);
+  for (let y = 0; y < nh; y++) {
+    for (let x = 0; x < nw; x++) {
+      const sx = Math.min(x * scale, w - 1);
+      const sy = Math.min(y * scale, h - 1);
+      out[y * nw + x] = buf[sy * w + sx];
+    }
+  }
+  return out;
+}
+
+function upsampleAlpha(buf: Float32Array, sw: number, sh: number, tw: number, th: number): Float32Array {
+  if (sw === tw && sh === th) return buf;
+  const out = new Float32Array(tw * th);
+  for (let y = 0; y < th; y++) {
+    for (let x = 0; x < tw; x++) {
+      const sx = Math.min(Math.floor(x * sw / tw), sw - 1);
+      const sy = Math.min(Math.floor(y * sh / th), sh - 1);
+      out[y * tw + x] = buf[sy * sw + sx];
+    }
+  }
+  return out;
+}
+
+function applyAlphaThreshold(alpha: Float32Array, threshold: number): Float32Array {
+  const t = threshold / 255;
+  const out = new Float32Array(alpha.length);
+  for (let i = 0; i < alpha.length; i++) {
+    out[i] = alpha[i] >= t ? 1 : 0;
+  }
+  return out;
+}
+
+function bufferToImageData(buf: Float32Array, width: number, height: number, alpha?: Float32Array | null): ImageData {
   const data = new Uint8ClampedArray(width * height * 4);
   for (let i = 0; i < width * height; i++) {
     data[i * 4]     = Math.round(buf[i * 3]     * 255);
     data[i * 4 + 1] = Math.round(buf[i * 3 + 1] * 255);
     data[i * 4 + 2] = Math.round(buf[i * 3 + 2] * 255);
-    data[i * 4 + 3] = 255;
+    data[i * 4 + 3] = alpha ? Math.round(alpha[i] * 255) : 255;
   }
   return new ImageData(data, width, height);
 }
 
 export async function dither(params: DitherParams): Promise<DitherResult> {
-  const { width, height, source, algorithm, ditherScale, colorCount, ditherStrength, gammaCorrection, imagePaletteMode, ditherTechnique, directionAngle } = params;
+  const { width, height, source, algorithm, ditherScale, colorCount, ditherStrength, gammaCorrection, imagePaletteMode, ditherTechnique, directionAngle, alphaThreshold } = params;
   let { palette } = params;
 
   const technique = ditherTechnique || 'continuous';
 
-  // Get source buffer
+  // Get source buffer and alpha
   let buf: Float32Array;
+  let alphaRaw: Float32Array | null = null;
   if (source.type === 'gradient') {
     buf = rasterizeGradient(width, height, source.gradient);
     if (!palette) {
@@ -391,6 +429,7 @@ export async function dither(params: DitherParams): Promise<DitherResult> {
     }
   } else {
     buf = new Float32Array(source.imageBuffer);
+    alphaRaw = source.alphaBuffer ?? null;
     if (!palette) {
       palette = generateImagePalette(source.imageBuffer, width, height, colorCount, imagePaletteMode);
     }
@@ -398,6 +437,10 @@ export async function dither(params: DitherParams): Promise<DitherResult> {
 
   // Downsample to block resolution
   const ds = downsample(buf, width, height, ditherScale);
+  let dsAlpha: Float32Array | null = null;
+  if (alphaRaw) {
+    dsAlpha = downsampleAlpha(alphaRaw, width, height, ditherScale);
+  }
 
   // Apply gamma correction: linearize before dithering
   let ditherPalette = palette;
@@ -457,8 +500,15 @@ export async function dither(params: DitherParams): Promise<DitherResult> {
 
   buf = upsample(ds.buf, ds.w, ds.h, width, height);
 
+  // Process alpha: upsample and apply threshold
+  let finalAlpha: Float32Array | null = null;
+  if (dsAlpha) {
+    const upAlpha = upsampleAlpha(dsAlpha, ds.w, ds.h, width, height);
+    finalAlpha = applyAlphaThreshold(upAlpha, alphaThreshold);
+  }
+
   return {
-    imageData: bufferToImageData(buf, width, height),
+    imageData: bufferToImageData(buf, width, height, finalAlpha),
     width,
     height,
   };

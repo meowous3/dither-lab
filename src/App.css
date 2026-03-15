@@ -570,6 +570,45 @@ input[type="color"] {
   font-variant-numeric: tabular-nums;
 }
 
+/* Palette from image */
+.palette-source-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.palette-source-thumb {
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+}
+.palette-swatches-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+.palette-swatch-lg {
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  border: 1px solid rgba(255,255,255,0.12);
+  cursor: default;
+}
+.palette-apply-btn {
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: 4px;
+  padding: 6px 0;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.palette-apply-btn:hover {
+  background: rgba(102, 204, 255, 0.08);
+}
+
 /* Scrollbar */
 .panel-right::-webkit-scrollbar { width: 6px; }
 .panel-right::-webkit-scrollbar-track { background: transparent; }

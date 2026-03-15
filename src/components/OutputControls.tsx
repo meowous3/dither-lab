@@ -8,12 +8,14 @@ interface OutputControlsProps {
   colorCount: number;
   ditherStrength: number;
   gammaCorrection: boolean;
-  onUpdate: (partial: { width?: number; height?: number; ditherScale?: number; colorCount?: number; ditherStrength?: number; gammaCorrection?: boolean }) => void;
+  alphaThreshold: number;
+  hasAlpha: boolean;
+  onUpdate: (partial: { width?: number; height?: number; ditherScale?: number; colorCount?: number; ditherStrength?: number; gammaCorrection?: boolean; alphaThreshold?: number }) => void;
   locks: Set<string>;
   toggleLock: (key: string) => void;
 }
 
-export function OutputControls({ width, height, ditherScale, colorCount, ditherStrength, gammaCorrection, onUpdate, locks, toggleLock }: OutputControlsProps) {
+export function OutputControls({ width, height, ditherScale, colorCount, ditherStrength, gammaCorrection, alphaThreshold, hasAlpha, onUpdate, locks, toggleLock }: OutputControlsProps) {
   return (
     <CollapsibleGroup title="Output">
       <div className="dimension-row">
@@ -89,6 +91,25 @@ export function OutputControls({ width, height, ditherScale, colorCount, ditherS
           <span className="range-value">{Math.round(ditherStrength * 100)}%</span>
         </div>
       </label>
+
+      {hasAlpha && (
+        <label>
+          <span className="label-with-lock">
+            Alpha Threshold
+            <LockToggle locked={locks.has('alphaThreshold')} onToggle={() => toggleLock('alphaThreshold')} />
+          </span>
+          <div className="range-row">
+            <input
+              type="range"
+              min={0}
+              max={255}
+              value={alphaThreshold}
+              onChange={(e) => onUpdate({ alphaThreshold: Number(e.target.value) })}
+            />
+            <span className="range-value">{alphaThreshold}</span>
+          </div>
+        </label>
+      )}
 
       <label className="checkbox-row">
         <input

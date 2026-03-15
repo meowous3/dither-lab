@@ -27,6 +27,7 @@ export function useBulkImages() {
         id: `bulk-${++idCounterRef.current}`,
         name: img.name,
         buffer: img.buffer,
+        alphaBuffer: img.alphaBuffer,
         width: img.width,
         height: img.height,
         overrides: {},

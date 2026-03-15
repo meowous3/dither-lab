@@ -9,6 +9,7 @@ import { TechniquePicker } from './components/TechniquePicker';
 import { OutputControls } from './components/OutputControls';
 import { DownloadBar } from './components/DownloadBar';
 import { ColorPaletteEditor } from './components/ColorPaletteEditor';
+import { PaletteFromImage } from './components/PaletteFromImage';
 import { PresetBar } from './components/PresetBar';
 import { BulkCarousel } from './components/BulkCarousel';
 import { BulkSettingsBar } from './components/BulkSettingsBar';
@@ -17,7 +18,7 @@ import type { DitherSettings } from './engine/bulk-types';
 import type { DitherState } from './hooks/useDitherEngine';
 
 function extractSettings(state: DitherState): DitherSettings {
-  const { sourceType: _, imageBuffer: _b, imageName: _n, width: _w, height: _h, ...settings } = state;
+  const { sourceType: _, imageBuffer: _b, alphaBuffer: _a, imageName: _n, width: _w, height: _h, ...settings } = state;
   return settings;
 }
 
@@ -49,7 +50,7 @@ export function App() {
     if (newImages.length > 0 && bulk.images.length === 0) {
       // First batch — load the first image into the engine
       const first = newImages[0];
-      loadBuffer(first.buffer, first.width, first.height, first.name);
+      loadBuffer(first.buffer, first.width, first.height, first.name, first.alphaBuffer);
     }
   }, [bulk, state, loadBuffer]);
 
@@ -75,7 +76,7 @@ export function App() {
     if (effective) {
       update({ ...effective });
     }
-    loadBuffer(img.buffer, img.width, img.height, img.name);
+    loadBuffer(img.buffer, img.width, img.height, img.name, img.alphaBuffer);
   }, [bulk.activeIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // After first bulk upload, load the first image
@@ -90,7 +91,7 @@ export function App() {
       if (effective) {
         update({ ...effective });
       }
-      loadBuffer(first.buffer, first.width, first.height, first.name);
+      loadBuffer(first.buffer, first.width, first.height, first.name, first.alphaBuffer);
     }
   }, [bulk.images.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -104,7 +105,7 @@ export function App() {
       const settingsKeys: (keyof DitherSettings)[] = [
         'gradient', 'algorithm', 'ditherScale', 'colorCount',
         'ditherStrength', 'gammaCorrection', 'imagePaletteMode',
-        'palette', 'ditherTechnique', 'directionAngle',
+        'palette', 'ditherTechnique', 'directionAngle', 'alphaThreshold',
       ];
       for (const key of settingsKeys) {
         if (key in partial) {
@@ -148,14 +149,14 @@ export function App() {
     } else if (remaining.length === 1) {
       // Dropping to single image mode — load the remaining image
       const single = remaining[0];
-      loadBuffer(single.buffer, single.width, single.height, single.name);
+      loadBuffer(single.buffer, single.width, single.height, single.name, single.alphaBuffer);
     } else {
       // Load next available image
       const nextIdx = Math.min(bulk.activeIndex, remaining.length - 1);
       const next = remaining[nextIdx];
       const effective = bulk.getEffectiveSettings(next);
       if (effective) update({ ...effective });
-      loadBuffer(next.buffer, next.width, next.height, next.name);
+      loadBuffer(next.buffer, next.width, next.height, next.name, next.alphaBuffer);
     }
   }, [bulk, clearImage, loadBuffer, update]);
 
@@ -274,6 +275,8 @@ export function App() {
           colorCount={state.colorCount}
           ditherStrength={state.ditherStrength}
           gammaCorrection={state.gammaCorrection}
+          alphaThreshold={state.alphaThreshold}
+          hasAlpha={state.alphaBuffer != null}
           onUpdate={handleUpdate}
           locks={locks}
           toggleLock={toggleLock}
@@ -283,6 +286,9 @@ export function App() {
           onUpdate={(palette) => handleUpdate({ palette })}
           locks={locks}
           toggleLock={toggleLock}
+        />
+        <PaletteFromImage
+          onApply={(palette) => handleUpdate({ palette })}
         />
         <DownloadBar
           result={result}

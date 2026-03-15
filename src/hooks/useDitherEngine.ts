@@ -17,8 +17,10 @@ export interface DitherState {
   palette: Color[] | undefined;
   ditherTechnique: DitherTechnique;
   directionAngle: number;
+  alphaThreshold: number;
   sourceType: 'gradient' | 'image';
   imageBuffer: Float32Array | null;
+  alphaBuffer: Float32Array | null;
   imageName: string | null;
 }
 
@@ -43,8 +45,10 @@ const DEFAULT_STATE: DitherState = {
   palette: undefined,
   ditherTechnique: 'intermediate',
   directionAngle: 0,
+  alphaThreshold: 128,
   sourceType: 'gradient',
   imageBuffer: null,
+  alphaBuffer: null,
   imageName: null,
 };
 
@@ -57,7 +61,7 @@ export function useDitherEngine() {
   const debouncedState = useDebounce(state, 50);
 
   useEffect(() => {
-    const { sourceType, imageBuffer, gradient, width, height, algorithm, ditherScale, colorCount, ditherStrength, gammaCorrection, imagePaletteMode, palette, ditherTechnique, directionAngle } = debouncedState;
+    const { sourceType, imageBuffer, alphaBuffer, gradient, width, height, algorithm, ditherScale, colorCount, ditherStrength, gammaCorrection, imagePaletteMode, palette, ditherTechnique, directionAngle, alphaThreshold } = debouncedState;
 
     // Skip if image mode but no image loaded yet
     if (sourceType === 'image' && !imageBuffer) return;
@@ -66,7 +70,7 @@ export function useDitherEngine() {
     setRendering(true);
 
     const source: DitherSource = sourceType === 'image' && imageBuffer
-      ? { type: 'image', imageBuffer }
+      ? { type: 'image', imageBuffer, alphaBuffer }
       : { type: 'gradient', gradient };
 
     const params: DitherParams = {
@@ -82,6 +86,7 @@ export function useDitherEngine() {
       palette,
       ditherTechnique,
       directionAngle,
+      alphaThreshold,
     };
 
     dither(params).then((res) => {
@@ -117,6 +122,7 @@ export function useDitherEngine() {
         ...prev,
         sourceType: 'image',
         imageBuffer: loaded.buffer,
+        alphaBuffer: loaded.alphaBuffer,
         imageName: loaded.name,
         width: loaded.width,
         height: loaded.height,
@@ -124,11 +130,12 @@ export function useDitherEngine() {
     });
   }, []);
 
-  const loadBuffer = useCallback((buffer: Float32Array, width: number, height: number, name: string) => {
+  const loadBuffer = useCallback((buffer: Float32Array, width: number, height: number, name: string, alphaBuffer?: Float32Array | null) => {
     setState((prev) => ({
       ...prev,
       sourceType: 'image',
       imageBuffer: buffer,
+      alphaBuffer: alphaBuffer ?? null,
       imageName: name,
       width,
       height,
@@ -140,6 +147,7 @@ export function useDitherEngine() {
       ...prev,
       sourceType: 'gradient',
       imageBuffer: null,
+      alphaBuffer: null,
       imageName: null,
     }));
   }, []);

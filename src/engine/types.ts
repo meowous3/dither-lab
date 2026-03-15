@@ -60,7 +60,7 @@ export type ImagePaletteMode =
 
 export type DitherSource =
   | { type: 'gradient'; gradient: GradientConfig }
-  | { type: 'image'; imageBuffer: Float32Array };
+  | { type: 'image'; imageBuffer: Float32Array; alphaBuffer?: Float32Array | null };
 
 export interface DitherParams {
   width: number;
@@ -75,6 +75,7 @@ export interface DitherParams {
   palette?: Color[];     // optional fixed palette
   ditherTechnique: DitherTechnique; // how the algorithm applies dithering
   directionAngle: number; // 0-360, for directional technique
+  alphaThreshold: number; // 0-255, pixels below this alpha become transparent
 }
 
 export interface DitherResult {

@@ -12,12 +12,16 @@ export function renderSVG(imageData: ImageData): string {
       const r = data[idx];
       const g = data[idx + 1];
       const b = data[idx + 2];
+      const a = data[idx + 3];
 
-      // Run-length: find consecutive pixels with same color
+      // Skip fully transparent pixels
+      if (a === 0) { x++; continue; }
+
+      // Run-length: find consecutive pixels with same color and alpha
       let runLen = 1;
       while (x + runLen < width) {
         const ni = (y * width + x + runLen) * 4;
-        if (data[ni] === r && data[ni + 1] === g && data[ni + 2] === b) {
+        if (data[ni] === r && data[ni + 1] === g && data[ni + 2] === b && data[ni + 3] === a) {
           runLen++;
         } else {
           break;
@@ -25,7 +29,12 @@ export function renderSVG(imageData: ImageData): string {
       }
 
       const hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-      rects.push(`<rect x="${x}" y="${y}" width="${runLen}" height="1" fill="${hex}"/>`);
+      if (a < 255) {
+        const opacity = (a / 255).toFixed(2);
+        rects.push(`<rect x="${x}" y="${y}" width="${runLen}" height="1" fill="${hex}" fill-opacity="${opacity}"/>`);
+      } else {
+        rects.push(`<rect x="${x}" y="${y}" width="${runLen}" height="1" fill="${hex}"/>`);
+      }
       x += runLen;
     }
   }
